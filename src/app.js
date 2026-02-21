@@ -420,21 +420,34 @@ app.get("/health", (req, res) => {
 });
 
 app.post("/twilio/voice", (req, res) => {
-  const appointmentId = parseId(req.query.appointmentId || req.body.appointmentId);
-  const minutesRaw = Number.parseInt(
-    String(req.query.minutes || req.body.minutes || ""),
-    10
+  const VoiceResponse = require("twilio").twiml.VoiceResponse;
+  const twiml = new VoiceResponse();
+
+  if (!appointments.length) {
+    twiml.say("You have no upcoming appointments.");
+    return res.type("text/xml").send(twiml.toString());
+  }
+
+  const upcoming = appointments[0]; // assumes first is next appointment
+
+  const appointmentDateTime = new Date(`${upcoming.date}T${upcoming.time}`);
+  const now = new Date();
+
+  const diffMs = appointmentDateTime - now;
+  const diffMinutes = Math.max(Math.round(diffMs / 60000), 0);
+
+  const formattedTime = appointmentDateTime.toLocaleTimeString("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  });
+
+  twiml.say(
+    `Reminder. Your ${upcoming.title} appointment starts at ${formattedTime}. It is in ${diffMinutes} minutes.`
   );
-  const minutesOffset = [30, 60].includes(minutesRaw) ? minutesRaw : null;
-  const appointment = appointmentId ? getAppointmentById(appointmentId) : null;
-  const message = buildVoiceReminderMessage(appointment, minutesOffset);
 
-  const twiml = `<?xml version="1.0" encoding="UTF-8"?>
-<Response>
-  <Say voice="Polly.Joanna">${escapeXml(message)}</Say>
-</Response>`;
-
-  res.type("text/xml").send(twiml);
+  res.type("text/xml");
+  res.send(twiml.toString());
 });
 
 app.get("/twilio/test-call", async (req, res) => {
