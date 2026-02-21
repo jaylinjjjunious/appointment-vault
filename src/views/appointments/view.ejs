@@ -52,6 +52,11 @@
   <div class="actions">
     <a class="button glass-button button-secondary" href="/">Back to List</a>
     <a class="button glass-button button-secondary" href="/appointments/<%= appointment.id %>/edit">Edit</a>
+    <% if (!appointment.isHistory) { %>
+      <form action="/appointments/<%= appointment.id %>/complete" method="POST">
+        <button class="button glass-button" type="submit">Complete</button>
+      </form>
+    <% } %>
     <form action="/appointments/<%= appointment.id %>/delete" method="POST">
       <button class="button glass-button button-danger" type="submit">Delete</button>
     </form>

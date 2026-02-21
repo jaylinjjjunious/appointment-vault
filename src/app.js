@@ -312,8 +312,11 @@ function getUpcomingAppointmentForCall(requestedId) {
   return db.prepare(
     `SELECT id, title, date, time
      FROM appointments
-     WHERE date > ?
+     WHERE completedAt IS NULL
+       AND (
+         date > ?
         OR (date = ? AND time >= ?)
+       )
      ORDER BY date ASC, time ASC, id ASC
      LIMIT 1`
   ).get(todayDate, todayDate, nowTime);
@@ -324,6 +327,14 @@ function isPastAppointment(appointment, todayDate, nowTime) {
     appointment.date < todayDate ||
     (appointment.date === todayDate && appointment.time < nowTime)
   );
+}
+
+function isCompletedAppointment(appointment) {
+  return Boolean(appointment?.completedAt);
+}
+
+function isHistoryAppointment(appointment, todayDate, nowTime) {
+  return isCompletedAppointment(appointment) || isPastAppointment(appointment, todayDate, nowTime);
 }
 
 function applyAgentDefaults(input) {
@@ -436,6 +447,7 @@ function getTodayAppointments(now = new Date()) {
     `SELECT id, title, date, time
      FROM appointments
      WHERE date = ?
+       AND completedAt IS NULL
      ORDER BY time ASC, id ASC`
   ).all(todayDate);
 }
@@ -647,20 +659,24 @@ app.get("/", (req, res) => {
         ...appointment,
         tagList: tagsToArray(appointment.tags),
         isPast: isPastAppointment(appointment, todayDate, nowTime),
-        isCompleted: isPastAppointment(appointment, todayDate, nowTime)
+        isCompleted: isCompletedAppointment(appointment),
+        isHistory: isHistoryAppointment(appointment, todayDate, nowTime)
       }));
 
     const todayAppointments = appointments.filter(
-      (appointment) => appointment.date === todayDate && appointment.time >= nowTime
+      (appointment) =>
+        !appointment.isHistory &&
+        appointment.date === todayDate &&
+        appointment.time >= nowTime
     );
     const thisWeekAppointments = appointments.filter(
       (appointment) =>
-        !appointment.isPast &&
+        !appointment.isHistory &&
         appointment.date >= todayDate &&
         appointment.date <= endOfWeekDate
     );
     const upcomingAppointments = appointments.filter(
-      (appointment) => appointment.date > endOfWeekDate
+      (appointment) => !appointment.isHistory && appointment.date > endOfWeekDate
     );
 
     const googleStatusMessage =
@@ -700,9 +716,11 @@ function renderSettingsPage(req, res, next) {
       .map((appointment) => ({
         ...appointment,
         tagList: tagsToArray(appointment.tags),
-        isPast: isPastAppointment(appointment, todayDate, nowTime)
+        isPast: isPastAppointment(appointment, todayDate, nowTime),
+        isCompleted: isCompletedAppointment(appointment),
+        isHistory: isHistoryAppointment(appointment, todayDate, nowTime)
       }))
-      .filter((appointment) => appointment.isPast)
+      .filter((appointment) => appointment.isHistory)
       .sort((left, right) => {
         if (left.date !== right.date) {
           return right.date.localeCompare(left.date);
@@ -739,6 +757,7 @@ app.get("/settings/", renderSettingsPage);
 app.get("/setting", (req, res) => {
   res.redirect("/settings");
 });
+app.get(/^\/settings\/.+$/i, renderSettingsPage);
 
 app.get("/agent", (req, res) => {
   renderAgentPage(res);
@@ -954,11 +973,16 @@ app.get("/appointments/:id", (req, res, next) => {
       return;
     }
 
+    const now = new Date();
+    const todayDate = formatLocalDate(now);
+    const nowTime = formatLocalTime(now);
+
     res.render("appointments/view", {
       title: appointment.title,
       appointment: {
         ...appointment,
-        tagList: tagsToArray(appointment.tags)
+        tagList: tagsToArray(appointment.tags),
+        isHistory: isHistoryAppointment(appointment, todayDate, nowTime)
       }
     });
   } catch (error) {
@@ -1072,6 +1096,43 @@ app.post("/appointments/:id/delete", async (req, res, next) => {
     }
 
     db.prepare("DELETE FROM appointments WHERE id = ?").run(id);
+    res.redirect("/");
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/appointments/:id/complete", (req, res, next) => {
+  try {
+    const id = parseId(req.params.id);
+    if (!id) {
+      res.status(404).render("404", { title: "Not Found" });
+      return;
+    }
+
+    const existing = getAppointmentById(id);
+    if (!existing) {
+      res.status(404).render("404", { title: "Not Found" });
+      return;
+    }
+
+    db.prepare(
+      `UPDATE appointments
+       SET completedAt = @completedAt,
+           updatedAt = @updatedAt
+       WHERE id = @id`
+    ).run({
+      id,
+      completedAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    });
+
+    const referer = String(req.get("referer") || "").trim();
+    if (referer.includes("/settings")) {
+      res.redirect("/settings");
+      return;
+    }
+
     res.redirect("/");
   } catch (error) {
     next(error);

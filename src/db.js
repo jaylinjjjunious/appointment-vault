@@ -21,6 +21,7 @@ db.exec(`
     tags TEXT,
     reminderMinutes INTEGER,
     googleEventId TEXT,
+    completedAt TEXT,
     createdAt TEXT NOT NULL,
     updatedAt TEXT NOT NULL
   )
@@ -33,6 +34,10 @@ const columnNames = db
 
 if (!columnNames.includes("googleEventId")) {
   db.exec("ALTER TABLE appointments ADD COLUMN googleEventId TEXT");
+}
+
+if (!columnNames.includes("completedAt")) {
+  db.exec("ALTER TABLE appointments ADD COLUMN completedAt TEXT");
 }
 
 db.exec(`

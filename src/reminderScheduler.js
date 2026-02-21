@@ -121,7 +121,8 @@ function getUpcomingAppointments(now) {
     .prepare(
       `SELECT id, title, date, time, location
        FROM appointments
-       WHERE date >= ?
+       WHERE completedAt IS NULL
+         AND date >= ?
          AND date <= ?
        ORDER BY date ASC, time ASC, id ASC`
     )
