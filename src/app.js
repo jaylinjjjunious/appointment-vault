@@ -548,7 +548,7 @@ app.get("/", (req, res) => {
   }
 });
 
-app.get("/settings", (req, res, next) => {
+function renderSettingsPage(req, res, next) {
   try {
     const now = new Date();
     const todayDate = formatLocalDate(now);
@@ -581,6 +581,12 @@ app.get("/settings", (req, res, next) => {
   } catch (error) {
     next(error);
   }
+}
+
+app.get("/settings", renderSettingsPage);
+app.get("/settings/", renderSettingsPage);
+app.get("/setting", (req, res) => {
+  res.redirect("/settings");
 });
 
 app.get("/agent", (req, res) => {
