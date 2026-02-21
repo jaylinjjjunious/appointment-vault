@@ -356,36 +356,82 @@ function getMinutesUntilAppointment(appointmentDateTime, now = new Date()) {
   return Math.ceil(deltaMs / (60 * 1000));
 }
 
-function buildVoiceReminderMessage(appointment, minutesOffset) {
-  const hasMinutes = minutesOffset === 30 || minutesOffset === 60;
+function formatVoiceTime(appointmentDateTime) {
+  return appointmentDateTime.toLocaleTimeString("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true
+  });
+}
 
-  if (!appointment) {
-    return hasMinutes
-      ? `Reminder. You have an appointment in ${minutesOffset} minutes.`
-      : "Reminder. You have an upcoming appointment.";
-  }
+function getTodayAppointments(now = new Date()) {
+  const todayDate = formatLocalDate(now);
+  return db.prepare(
+    `SELECT id, title, date, time
+     FROM appointments
+     WHERE date = ?
+     ORDER BY time ASC, id ASC`
+  ).all(todayDate);
+}
 
-  let spokenMinutes = minutesOffset;
-  if (hasMinutes) {
-    const appointmentDateTime = parseAppointmentDateTime(appointment);
-    if (appointmentDateTime) {
-      const minutesUntilStart = getMinutesUntilAppointment(appointmentDateTime);
-      // Keep normal "60/30 minute reminder" wording near the expected mark.
-      // If the reminder is sent late, announce the true minutes remaining.
-      spokenMinutes =
-        minutesUntilStart < minutesOffset - 1
-          ? minutesUntilStart
-          : minutesOffset;
+function buildTodayVoiceMessage(requestedAppointmentId, now = new Date()) {
+  const todayDate = formatLocalDate(now);
+  const nowTime = formatLocalTime(now);
+  const todayAppointments = getTodayAppointments(now);
+  const upcomingToday = todayAppointments.filter((appointment) => appointment.time >= nowTime);
+
+  if (requestedAppointmentId) {
+    const requested = getAppointmentById(requestedAppointmentId);
+    if (requested) {
+      const requestedDateTime = parseAppointmentDateTime(requested);
+      const formattedTime = requestedDateTime
+        ? formatVoiceTime(requestedDateTime)
+        : formatDisplayTime(requested.time);
+      const diffMinutes = requestedDateTime
+        ? getMinutesUntilAppointment(requestedDateTime, now)
+        : 0;
+
+      if (requested.date === todayDate) {
+        const laterCount = todayAppointments.filter(
+          (appointment) => appointment.time > requested.time
+        ).length;
+        let message =
+          `Reminder. Your ${requested.title} appointment starts at ${formattedTime}. ` +
+          `It is in ${diffMinutes} minutes.`;
+        if (laterCount > 0) {
+          message += ` You have ${laterCount} more appointment${laterCount === 1 ? "" : "s"} later today.`;
+        }
+        return message;
+      }
+
+      return (
+        `Reminder. Your ${requested.title} appointment is on ${requested.date} ` +
+        `at ${formattedTime}. It is in ${diffMinutes} minutes.`
+      );
     }
   }
 
-  let message = hasMinutes
-    ? `Reminder. You have ${appointment.title} in ${spokenMinutes} minutes at ${appointment.time}.`
-    : `Reminder. You have ${appointment.title} at ${appointment.time}.`;
-
-  if (appointment.location) {
-    message += ` Location: ${appointment.location}.`;
+  if (upcomingToday.length === 0) {
+    return "You have no more appointments scheduled for today.";
   }
+
+  const nextAppointment = upcomingToday[0];
+  const nextDateTime = parseAppointmentDateTime(nextAppointment);
+  const formattedTime = nextDateTime
+    ? formatVoiceTime(nextDateTime)
+    : formatDisplayTime(nextAppointment.time);
+  const diffMinutes = nextDateTime
+    ? getMinutesUntilAppointment(nextDateTime, now)
+    : 0;
+  const laterCount = Math.max(upcomingToday.length - 1, 0);
+
+  let message =
+    `Reminder. Your next appointment is ${nextAppointment.title} at ${formattedTime}. ` +
+    `It is in ${diffMinutes} minutes.`;
+  if (laterCount > 0) {
+    message += ` You have ${laterCount} more appointment${laterCount === 1 ? "" : "s"} later today.`;
+  }
+
   return message;
 }
 
@@ -442,43 +488,7 @@ app.post("/twilio/voice", (req, res) => {
   const VoiceResponse = require("twilio").twiml.VoiceResponse;
   const twiml = new VoiceResponse();
   const requestedId = parseId(req.query.appointmentId || req.body.appointmentId);
-  const now = new Date();
-  const todayDate = formatLocalDate(now);
-  const nowTime = formatLocalTime(now);
-  const appointments = requestedId
-    ? (() => {
-      const appointment = getAppointmentById(requestedId);
-      return appointment ? [appointment] : [];
-    })()
-    : db.prepare(
-      `SELECT id, title, date, time
-       FROM appointments
-       WHERE date > ?
-          OR (date = ? AND time >= ?)
-       ORDER BY date ASC, time ASC, id ASC`
-    ).all(todayDate, todayDate, nowTime);
-
-  if (!appointments.length) {
-    twiml.say("You have no upcoming appointments.");
-    return res.type("text/xml").send(twiml.toString());
-  }
-
-  const upcoming = appointments[0]; // assumes first is next appointment
-
-  const appointmentDateTime = new Date(`${upcoming.date}T${upcoming.time}`);
-
-  const diffMs = appointmentDateTime - now;
-  const diffMinutes = Math.max(Math.round(diffMs / 60000), 0);
-
-  const formattedTime = appointmentDateTime.toLocaleTimeString("en-US", {
-    hour: "numeric",
-    minute: "2-digit",
-    hour12: true,
-  });
-
-  twiml.say(
-    `Reminder. Your ${upcoming.title} appointment starts at ${formattedTime}. It is in ${diffMinutes} minutes.`
-  );
+  twiml.say(buildTodayVoiceMessage(requestedId, new Date()));
 
   res.type("text/xml");
   res.send(twiml.toString());
