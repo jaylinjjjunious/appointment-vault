@@ -1,0 +1,79 @@
+<%- include("../partials/top", { title }) %>
+
+<section class="page-heading">
+  <h1><%= pageTitle %></h1>
+  <% if (quickAddMode) { %>
+    <p>Quick Add Mode: only title, date, and time are required.</p>
+  <% } else { %>
+    <p>Update appointment details below.</p>
+  <% } %>
+</section>
+
+<section class="card glass-panel">
+  <form class="form-grid" action="<%= formAction %>" method="POST" novalidate>
+    <div class="form-field">
+      <label for="title">Title *</label>
+      <input id="title" class="glass-input" name="title" type="text" value="<%= appointment.title %>" />
+      <% if (errors.title) { %>
+        <p class="field-error"><%= errors.title %></p>
+      <% } %>
+    </div>
+
+    <div class="form-row">
+      <div class="form-field">
+        <label for="date">Date (YYYY-MM-DD) *</label>
+        <input id="date" class="glass-input" name="date" type="date" value="<%= appointment.date %>" />
+        <% if (errors.date) { %>
+          <p class="field-error"><%= errors.date %></p>
+        <% } %>
+      </div>
+
+      <div class="form-field">
+        <label for="time">Time (HH:MM) *</label>
+        <input id="time" class="glass-input" name="time" type="time" value="<%= appointment.time %>" />
+        <% if (errors.time) { %>
+          <p class="field-error"><%= errors.time %></p>
+        <% } %>
+      </div>
+    </div>
+
+    <details class="advanced-options" <%= quickAddMode ? "" : "open" %>>
+      <summary>Advanced Options</summary>
+
+      <div class="form-field">
+        <label for="location">Location</label>
+        <input id="location" class="glass-input" name="location" type="text" value="<%= appointment.location %>" />
+      </div>
+
+      <div class="form-field">
+        <label for="tags">Tags (comma-separated)</label>
+        <input id="tags" class="glass-input" name="tags" type="text" value="<%= appointment.tags %>" />
+      </div>
+
+      <div class="form-field">
+        <label for="reminderMinutes">Reminder Minutes</label>
+        <input
+          id="reminderMinutes"
+          class="glass-input"
+          name="reminderMinutes"
+          type="number"
+          min="0"
+          step="1"
+          value="<%= appointment.reminderMinutes %>"
+        />
+      </div>
+
+      <div class="form-field">
+        <label for="notes">Notes</label>
+        <textarea id="notes" class="glass-input" name="notes" rows="5"><%= appointment.notes %></textarea>
+      </div>
+    </details>
+
+    <div class="actions">
+      <button class="button glass-button" type="submit"><%= submitLabel %></button>
+      <a class="button glass-button button-secondary" href="/">Cancel</a>
+    </div>
+  </form>
+</section>
+
+<%- include("../partials/bottom") %>

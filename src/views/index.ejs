@@ -1,0 +1,182 @@
+<%- include("partials/top", { title }) %>
+<%
+  const to12Hour =
+    typeof formatDisplayTime === "function"
+      ? formatDisplayTime
+      : (timeValue) => {
+        const value = String(timeValue ?? "").trim();
+        const match = /^([01]\d|2[0-3]):([0-5]\d)$/.exec(value);
+        if (!match) {
+          return value;
+        }
+
+        const hour24 = Number.parseInt(match[1], 10);
+        const minutes = match[2];
+        const meridiem = hour24 >= 12 ? "PM" : "AM";
+        const hour12 = hour24 % 12 === 0 ? 12 : hour24 % 12;
+        return `${hour12}:${minutes} ${meridiem}`;
+      };
+
+  const fallbackAppointments =
+    typeof appointments !== "undefined" && Array.isArray(appointments) ? appointments : [];
+  const safeTodayAppointments =
+    typeof todayAppointments !== "undefined" && Array.isArray(todayAppointments)
+      ? todayAppointments
+      : [];
+  const safeThisWeekAppointments =
+    typeof thisWeekAppointments !== "undefined" && Array.isArray(thisWeekAppointments)
+      ? thisWeekAppointments
+      : [];
+  const safeUpcomingAppointments =
+    typeof upcomingAppointments !== "undefined" && Array.isArray(upcomingAppointments)
+      ? upcomingAppointments
+      : safeTodayAppointments.length === 0 && safeThisWeekAppointments.length === 0
+        ? fallbackAppointments
+        : [];
+%>
+
+<section class="page-heading">
+  <h1>All Appointments</h1>
+  <p>Track your upcoming plans in one place.</p>
+</section>
+
+<section class="card glass-panel quick-add-card">
+  <h2>Quick Add</h2>
+  <form class="form-grid" action="/agent/parse" method="POST">
+    <div class="form-field">
+      <label for="quickText">Add appointment in plain language</label>
+      <textarea
+        id="quickText"
+        name="quickText"
+        rows="4"
+        class="agent-textarea glass-input"
+        placeholder="Dentist tomorrow 3pm remind 30&#10;Court 2/25 8:30am&#10;Job interview Friday 10am at 4900 California Ave"
+      ></textarea>
+    </div>
+    <div class="actions">
+      <button class="button glass-button" type="submit">Create</button>
+      <a class="button glass-button button-secondary" href="/appointments/new">Manual Add</a>
+    </div>
+  </form>
+  <p class="quick-hint">Examples: “Dentist tomorrow 3pm remind 30”, “Court 2/25 8:30am”</p>
+</section>
+
+<% if (googleStatusMessage) { %>
+  <section class="card glass-panel status-card">
+    <p><%= googleStatusMessage %></p>
+  </section>
+<% } %>
+
+<% if (!googleConfigured) { %>
+  <section class="card glass-panel status-card warning-card">
+    <p>Google Calendar OAuth is not configured yet. Add the required Google env values.</p>
+  </section>
+<% } else if (!googleConnected) { %>
+  <section class="card glass-panel status-card warning-card">
+    <p>Google Calendar is not connected yet.</p>
+    <div class="actions">
+      <a class="button glass-button" href="/auth/google">Connect Google Calendar</a>
+    </div>
+  </section>
+<% } else { %>
+  <section class="card glass-panel status-card">
+    <p><strong>Connected:</strong> Google Calendar is linked for this session.</p>
+  </section>
+<% } %>
+
+<section class="calendar-section glass-panel today-section">
+  <h2>Today</h2>
+  <% if (safeTodayAppointments.length === 0) { %>
+    <p class="section-empty">No appointments today.</p>
+  <% } else { %>
+    <div class="list">
+      <% safeTodayAppointments.forEach((appointment) => { %>
+        <article class="card glass-card appointment-card <%= appointment.isCompleted ? 'completed-card' : '' %>">
+          <div class="appointment-main">
+            <h3><strong><%= appointment.title %></strong></h3>
+            <p><strong>Date:</strong> <%= appointment.date %></p>
+            <p><strong>Time:</strong> <%= to12Hour(appointment.time) %></p>
+            <% if (appointment.location) { %>
+              <p><strong>Location:</strong> <%= appointment.location %></p>
+            <% } %>
+            <% if (appointment.reminderMinutes !== null) { %>
+              <p><strong>Reminder:</strong> <%= appointment.reminderMinutes %> min before</p>
+            <% } %>
+            <% if (appointment.isCompleted) { %>
+              <p class="completed-label">Completed</p>
+            <% } %>
+          </div>
+          <div class="actions">
+            <a class="button glass-button button-secondary" href="/appointments/<%= appointment.id %>">View</a>
+            <a class="button glass-button button-secondary" href="/appointments/<%= appointment.id %>/edit">Edit</a>
+            <form action="/appointments/<%= appointment.id %>/delete" method="POST">
+              <button class="button glass-button button-danger" type="submit">Delete</button>
+            </form>
+          </div>
+        </article>
+      <% }) %>
+    </div>
+  <% } %>
+</section>
+
+<section class="calendar-section glass-panel">
+  <h2>This Week</h2>
+  <% if (safeThisWeekAppointments.length === 0) { %>
+    <p class="section-empty">No appointments this week.</p>
+  <% } else { %>
+    <div class="week-list">
+      <% safeThisWeekAppointments.forEach((appointment) => { %>
+        <article class="week-row">
+          <div class="week-col week-col-title">
+            <strong><%= appointment.title %></strong>
+          </div>
+          <div class="week-col"><%= appointment.date %></div>
+          <div class="week-col"><%= to12Hour(appointment.time) %></div>
+          <div class="week-col"><%= appointment.location || "—" %></div>
+          <div class="week-col"><%= appointment.reminderMinutes !== null ? appointment.reminderMinutes + " min" : "—" %></div>
+          <div class="week-actions">
+            <a class="button glass-button button-secondary" href="/appointments/<%= appointment.id %>">View</a>
+            <a class="button glass-button button-secondary" href="/appointments/<%= appointment.id %>/edit">Edit</a>
+            <form class="inline-nav-form" action="/appointments/<%= appointment.id %>/delete" method="POST">
+              <button class="button glass-button button-danger" type="submit">Delete</button>
+            </form>
+          </div>
+        </article>
+      <% }) %>
+    </div>
+  <% } %>
+</section>
+
+<section class="calendar-section glass-panel">
+  <h2>Upcoming</h2>
+  <% if (safeUpcomingAppointments.length === 0) { %>
+    <p class="section-empty">No upcoming appointments.</p>
+  <% } else { %>
+    <div class="list">
+      <% safeUpcomingAppointments.forEach((appointment) => { %>
+        <article class="card glass-card appointment-card">
+          <div class="appointment-main">
+            <h3><strong><%= appointment.title %></strong></h3>
+            <p><strong>Date:</strong> <%= appointment.date %></p>
+            <p><strong>Time:</strong> <%= to12Hour(appointment.time) %></p>
+            <% if (appointment.location) { %>
+              <p><strong>Location:</strong> <%= appointment.location %></p>
+            <% } %>
+            <% if (appointment.reminderMinutes !== null) { %>
+              <p><strong>Reminder:</strong> <%= appointment.reminderMinutes %> min before</p>
+            <% } %>
+          </div>
+          <div class="actions">
+            <a class="button glass-button button-secondary" href="/appointments/<%= appointment.id %>">View</a>
+            <a class="button glass-button button-secondary" href="/appointments/<%= appointment.id %>/edit">Edit</a>
+            <form action="/appointments/<%= appointment.id %>/delete" method="POST">
+              <button class="button glass-button button-danger" type="submit">Delete</button>
+            </form>
+          </div>
+        </article>
+      <% }) %>
+    </div>
+  <% } %>
+</section>
+
+<%- include("partials/bottom") %>

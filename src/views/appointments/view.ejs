@@ -1,0 +1,61 @@
+<%- include("../partials/top", { title: appointment.title }) %>
+<%
+  const to12Hour =
+    typeof formatDisplayTime === "function"
+      ? formatDisplayTime
+      : (timeValue) => {
+        const value = String(timeValue ?? "").trim();
+        const match = /^([01]\d|2[0-3]):([0-5]\d)$/.exec(value);
+        if (!match) {
+          return value;
+        }
+
+        const hour24 = Number.parseInt(match[1], 10);
+        const minutes = match[2];
+        const meridiem = hour24 >= 12 ? "PM" : "AM";
+        const hour12 = hour24 % 12 === 0 ? 12 : hour24 % 12;
+        return `${hour12}:${minutes} ${meridiem}`;
+      };
+%>
+
+<section class="page-heading">
+  <h1><%= appointment.title %></h1>
+  <p>Appointment details</p>
+</section>
+
+<article class="card glass-panel detail-card">
+  <p><strong>Date:</strong> <%= appointment.date %></p>
+  <p><strong>Time:</strong> <%= to12Hour(appointment.time) %></p>
+  <p><strong>Location:</strong> <%= appointment.location || "Not provided" %></p>
+  <p><strong>Reminder Minutes:</strong> <%= appointment.reminderMinutes ?? "Not set" %></p>
+
+  <% if (appointment.tagList.length > 0) { %>
+    <div class="tag-group">
+      <% appointment.tagList.forEach((tag) => { %>
+        <span class="tag"><%= tag %></span>
+      <% }) %>
+    </div>
+  <% } else { %>
+    <p><strong>Tags:</strong> None</p>
+  <% } %>
+
+  <div class="notes-block">
+    <h2>Notes</h2>
+    <p><%= appointment.notes || "No notes added." %></p>
+  </div>
+
+  <div class="meta">
+    <p><strong>Created:</strong> <%= appointment.createdAt %></p>
+    <p><strong>Last Updated:</strong> <%= appointment.updatedAt %></p>
+  </div>
+
+  <div class="actions">
+    <a class="button glass-button button-secondary" href="/">Back to List</a>
+    <a class="button glass-button button-secondary" href="/appointments/<%= appointment.id %>/edit">Edit</a>
+    <form action="/appointments/<%= appointment.id %>/delete" method="POST">
+      <button class="button glass-button button-danger" type="submit">Delete</button>
+    </form>
+  </div>
+</article>
+
+<%- include("../partials/bottom") %>

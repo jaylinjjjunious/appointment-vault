@@ -1,0 +1,140 @@
+<%- include("partials/top", { title }) %>
+<%
+  const to12Hour =
+    typeof formatDisplayTime === "function"
+      ? formatDisplayTime
+      : (timeValue) => {
+        const value = String(timeValue ?? "").trim();
+        const match = /^([01]\d|2[0-3]):([0-5]\d)$/.exec(value);
+        if (!match) {
+          return value;
+        }
+
+        const hour24 = Number.parseInt(match[1], 10);
+        const minutes = match[2];
+        const meridiem = hour24 >= 12 ? "PM" : "AM";
+        const hour12 = hour24 % 12 === 0 ? 12 : hour24 % 12;
+        return `${hour12}:${minutes} ${meridiem}`;
+      };
+%>
+
+<section class="page-heading">
+  <h1>AI Quick Add</h1>
+  <p>Type it naturally, preview it, then save.</p>
+</section>
+
+<section class="card glass-panel">
+  <form class="form-grid" action="/agent/parse" method="POST">
+    <div class="form-field">
+      <label for="promptText">Tell me your appointment</label>
+      <textarea
+        id="promptText"
+        name="promptText"
+        rows="5"
+        class="agent-textarea glass-input"
+        placeholder="Dentist tomorrow 3pm remind 30"
+      ><%= promptText %></textarea>
+    </div>
+    <div class="actions">
+      <button class="button glass-button" type="submit">Parse</button>
+    </div>
+  </form>
+
+  <section class="examples">
+    <h2>Example inputs</h2>
+    <ul>
+      <li>Dentist tomorrow at 3pm, remind me 30 minutes before</li>
+      <li>Job interview Friday 10am at 4900 California Ave, notes: bring ID</li>
+      <li>Court 2/25 8:30am</li>
+    </ul>
+  </section>
+</section>
+
+<% if (parseError) { %>
+  <section class="card glass-panel error-card">
+    <p class="error-text"><%= parseError %></p>
+  </section>
+<% } %>
+
+<% if (parsed) { %>
+  <section class="card glass-panel">
+    <h2>Preview</h2>
+    <div class="preview-grid">
+      <p><strong>Title:</strong> <%= parsed.title || "Not set" %></p>
+      <p><strong>Date:</strong> <%= parsed.date || "Not set" %></p>
+      <p><strong>Time:</strong> <%= parsed.time ? to12Hour(parsed.time) : "Not set" %></p>
+      <p><strong>Location:</strong> <%= parsed.location || "None" %></p>
+      <p><strong>Reminder:</strong> <%= parsed.reminderMinutes === "" ? "None" : parsed.reminderMinutes + " min" %></p>
+      <p><strong>Tags:</strong> <%= parsed.tags || "None" %></p>
+      <p class="preview-notes"><strong>Notes:</strong> <%= parsed.notes || "None" %></p>
+    </div>
+
+    <form class="form-grid" action="/agent/save" method="POST">
+      <input type="hidden" name="promptText" value="<%= promptText %>" />
+
+      <details class="edit-details" <%= Object.keys(saveErrors).length > 0 ? "open" : "" %>>
+        <summary>Edit details</summary>
+
+        <div class="form-field">
+          <label for="title">Title</label>
+          <input id="title" class="glass-input" name="title" type="text" value="<%= parsed.title %>" required />
+          <% if (saveErrors.title) { %><p class="field-error"><%= saveErrors.title %></p><% } %>
+        </div>
+
+        <div class="form-row">
+          <div class="form-field">
+            <label for="date">Date</label>
+            <input id="date" class="glass-input" name="date" type="date" value="<%= parsed.date %>" required />
+            <% if (saveErrors.date) { %><p class="field-error"><%= saveErrors.date %></p><% } %>
+          </div>
+
+          <div class="form-field">
+            <label for="time">Time</label>
+            <input id="time" class="glass-input" name="time" type="time" value="<%= parsed.time %>" required />
+            <% if (saveErrors.time) { %><p class="field-error"><%= saveErrors.time %></p><% } %>
+          </div>
+        </div>
+
+        <div class="form-field">
+          <label for="location">Location</label>
+          <input id="location" class="glass-input" name="location" type="text" value="<%= parsed.location %>" />
+        </div>
+
+        <div class="form-row">
+          <div class="form-field">
+            <label for="tags">Tags (comma-separated)</label>
+            <input id="tags" class="glass-input" name="tags" type="text" value="<%= parsed.tags %>" />
+          </div>
+
+          <div class="form-field">
+            <label for="reminderMinutes">Reminder Minutes</label>
+            <input
+              id="reminderMinutes"
+              class="glass-input"
+              name="reminderMinutes"
+              type="number"
+              min="0"
+              step="1"
+              value="<%= parsed.reminderMinutes %>"
+            />
+          </div>
+        </div>
+
+        <div class="form-field">
+          <label for="notes">Notes</label>
+          <textarea id="notes" class="glass-input" name="notes" rows="4"><%= parsed.notes %></textarea>
+        </div>
+      </details>
+
+      <% if (saveErrors.title || saveErrors.date || saveErrors.time) { %>
+        <p class="field-error">Please fix required fields (title, date, time) before saving.</p>
+      <% } %>
+
+      <div class="actions">
+        <button class="button glass-button" type="submit">Save it</button>
+      </div>
+    </form>
+  </section>
+<% } %>
+
+<%- include("partials/bottom") %>
