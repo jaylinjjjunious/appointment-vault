@@ -51,19 +51,19 @@ app.use(
   })
 );
 app.use((req, res, next) => {
-  if (!isGoogleConnected(req.session)) {
-    const persistedTokens = getPersistedGoogleTokens();
-    if (persistedTokens) {
-      setGoogleTokensOnSession(req.session, persistedTokens);
-    }
+  const persistedTokens = getPersistedGoogleTokens();
+  if (!isGoogleConnected(req.session) && persistedTokens) {
+    setGoogleTokensOnSession(req.session, persistedTokens);
   }
 
+  req.persistedGoogleTokens = persistedTokens;
   next();
 });
 app.use("/public", express.static(path.join(__dirname, "public")));
 app.use((req, res, next) => {
   res.locals.googleConfigured = hasGoogleConfig();
-  res.locals.googleConnected = isGoogleConnected(req.session);
+  res.locals.googleConnected =
+    isGoogleConnected(req.session) || Boolean(req.persistedGoogleTokens);
   res.locals.formatDisplayTime = formatDisplayTime;
   next();
 });
@@ -90,14 +90,26 @@ function getPersistedGoogleTokens() {
   return null;
 }
 
+function mergeGoogleTokens(nextTokens, previousTokens) {
+  const merged = { ...(previousTokens || {}), ...(nextTokens || {}) };
+
+  if (!merged.refresh_token && previousTokens?.refresh_token) {
+    merged.refresh_token = previousTokens.refresh_token;
+  }
+
+  return merged;
+}
+
 function persistGoogleTokens(tokens) {
-  if (!tokens || (!tokens.access_token && !tokens.refresh_token)) {
+  const existingTokens = getPersistedGoogleTokens();
+  const merged = mergeGoogleTokens(tokens, existingTokens);
+  if (!merged || (!merged.access_token && !merged.refresh_token)) {
     return;
   }
 
   upsertAppSettingStatement.run({
     key: GOOGLE_TOKENS_SETTING_KEY,
-    value: JSON.stringify(tokens),
+    value: JSON.stringify(merged),
     updatedAt: new Date().toISOString()
   });
 }
@@ -461,8 +473,9 @@ app.get("/auth/google/callback", async (req, res, next) => {
 
   try {
     const tokens = await exchangeCodeForTokens(code);
-    setGoogleTokensOnSession(req.session, tokens);
-    persistGoogleTokens(req.session.googleTokens || tokens);
+    const mergedTokens = mergeGoogleTokens(tokens, getPersistedGoogleTokens());
+    setGoogleTokensOnSession(req.session, mergedTokens);
+    persistGoogleTokens(mergedTokens);
     res.redirect("/?google=connected");
   } catch (error) {
     if (error instanceof GoogleCalendarError) {
