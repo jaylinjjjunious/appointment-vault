@@ -2,10 +2,13 @@ const fs = require("node:fs");
 const path = require("node:path");
 const Database = require("better-sqlite3");
 
-const dataDir = path.join(__dirname, "..", "data");
-fs.mkdirSync(dataDir, { recursive: true });
-
-const dbPath = path.join(dataDir, "appointments.db");
+const configuredDataDir = String(process.env.DATA_DIR || "").trim();
+const configuredDbPath = String(process.env.DATABASE_PATH || "").trim();
+const dataDir = configuredDataDir
+  ? path.resolve(configuredDataDir)
+  : path.join(__dirname, "..", "data");
+const dbPath = configuredDbPath ? path.resolve(configuredDbPath) : path.join(dataDir, "appointments.db");
+fs.mkdirSync(path.dirname(dbPath), { recursive: true });
 const db = new Database(dbPath);
 
 db.pragma("journal_mode = WAL");

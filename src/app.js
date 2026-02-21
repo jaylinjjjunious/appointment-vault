@@ -22,6 +22,11 @@ require("dotenv").config({ quiet: true });
 
 const app = express();
 const SESSION_SECRET = process.env.SESSION_SECRET || "appointment-vault-session-secret-change-me";
+const IS_PRODUCTION = process.env.NODE_ENV === "production";
+
+if (IS_PRODUCTION) {
+  app.set("trust proxy", 1);
+}
 function resolveAppTimezone() {
   const candidate =
     String(process.env.APP_TIMEZONE || process.env.TZ || "America/Los_Angeles").trim() ||
@@ -55,10 +60,11 @@ app.use(
     secret: SESSION_SECRET,
     resave: false,
     saveUninitialized: false,
+    proxy: IS_PRODUCTION,
     cookie: {
       httpOnly: true,
       sameSite: "lax",
-      secure: false,
+      secure: IS_PRODUCTION,
       maxAge: 1000 * 60 * 60 * 24 * 14
     }
   })
