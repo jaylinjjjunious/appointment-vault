@@ -46,13 +46,17 @@
       (<%= safeHistoryAppointments.length %> appointment<%= safeHistoryAppointments.length === 1 ? "" : "s" %>)
     <% } %>
   </p>
-  <a
+  <button
     id="openHistoryModal"
     class="button glass-button button-secondary"
-    href="/settings/history"
+    type="button"
   >
     View History Log
-  </a>
+  </button>
+  <noscript>
+    <a class="button glass-button button-secondary" href="/settings/history">Open History Page</a>
+  </noscript>
+  <p class="section-empty">If popup does not open, use <a href="/settings/history">History Page</a>.</p>
 </section>
 
 <div id="historyModal" class="history-modal-backdrop" hidden aria-hidden="true">
@@ -112,25 +116,17 @@
       modal.hidden = !isOpen;
       modal.setAttribute("aria-hidden", isOpen ? "false" : "true");
       document.body.classList.toggle("modal-open", isOpen);
-
-      if (isOpen) {
-        closeButton.focus();
-      } else {
-        openButton.focus();
-      }
     };
 
     openButton.addEventListener("click", (event) => {
-      if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
-        return;
-      }
-
       event.preventDefault();
+      event.stopPropagation();
       setOpen(true);
     });
 
     closeButton.addEventListener("click", (event) => {
       event.preventDefault();
+      event.stopPropagation();
       setOpen(false);
     });
 
