@@ -828,20 +828,6 @@ app.use((error, req, res, next) => {
 
 const PORT = process.env.PORT || 3000;
 
-const server = app.listen(PORT, "0.0.0.0", () => {
+app.listen(PORT, "0.0.0.0", () => {
   console.log(`Appointment Vault listening on ${PORT}`);
-  logTwilioEnvStatus();
-  startReminderScheduler();
-});
-
-server.on("error", (error) => {
-  if (error.code === "EADDRINUSE") {
-    console.error(
-      `Port ${PORT} is already in use. Try: $env:APP_PORT=3001; npm run dev`
-    );
-    process.exit(1);
-  }
-
-  console.error("Server failed to start:", error.message);
-  process.exit(1);
 });
