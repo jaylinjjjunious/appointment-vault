@@ -458,6 +458,46 @@ body {
   color: var(--danger);
 }
 
+.modal-open {
+  overflow: hidden;
+}
+
+.history-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.5);
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+
+.history-modal {
+  width: min(860px, 100%);
+  max-height: min(85vh, 760px);
+  overflow: hidden;
+  display: grid;
+  gap: 0.7rem;
+}
+
+.history-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.7rem;
+}
+
+.history-modal-header h2 {
+  margin: 0;
+}
+
+.history-modal-list {
+  overflow: auto;
+  max-height: min(62vh, 560px);
+  padding-right: 0.2rem;
+}
+
 .field-error {
   margin: 0.34rem 0 0;
   font-size: 0.9rem;
@@ -511,5 +551,18 @@ summary:focus-visible {
   .glass-panel,
   .card {
     padding: 1rem;
+  }
+
+  .history-modal {
+    max-height: 90vh;
+  }
+
+  .history-modal-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .history-modal-list {
+    max-height: 68vh;
   }
 }
