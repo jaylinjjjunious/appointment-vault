@@ -752,12 +752,10 @@ function renderSettingsPage(req, res, next) {
   }
 }
 
-app.get("/settings", renderSettingsPage);
-app.get("/settings/", renderSettingsPage);
 app.get("/setting", (req, res) => {
   res.redirect("/settings");
 });
-app.get(/^\/settings\/.+$/i, renderSettingsPage);
+app.get(/^\/settings.*$/i, renderSettingsPage);
 
 app.get("/agent", (req, res) => {
   renderAgentPage(res);
