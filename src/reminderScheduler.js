@@ -78,7 +78,7 @@ function normalizePublicBaseUrl() {
     return config.publicBaseUrl.replace(/\/+$/, "");
   }
 
-  const host = String(process.env.APP_HOST || "127.0.0.1").trim();
+  const host = String(process.env.APP_HOST || "localhost").trim();
   const port = String(process.env.APP_PORT || process.env.PORT || "3000").trim();
   return `http://${host}:${port}`;
 }
@@ -287,3 +287,4 @@ module.exports = {
   startReminderScheduler,
   triggerTestCall
 };
+

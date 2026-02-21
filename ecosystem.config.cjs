@@ -9,9 +9,10 @@ module.exports = {
       watch: false,
       max_memory_restart: "300M",
       env: {
-        APP_HOST: "127.0.0.1",
+        APP_HOST: "localhost",
         APP_PORT: "3000"
       }
     }
   ]
 };
+

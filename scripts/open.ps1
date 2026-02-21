@@ -1,7 +1,7 @@
 $ErrorActionPreference = "Stop"
 
 $projectRoot = Resolve-Path (Join-Path $PSScriptRoot "..")
-$bindHost = if ($env:APP_HOST) { $env:APP_HOST } else { "127.0.0.1" }
+$bindHost = if ($env:APP_HOST) { $env:APP_HOST } else { "localhost" }
 $port = 3000
 if ($env:APP_PORT) {
   $parsedPort = 0
@@ -25,3 +25,4 @@ try {
 }
 
 Write-Host "Opened $url"
+

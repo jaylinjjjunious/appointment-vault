@@ -87,15 +87,15 @@ You can also double-click:
 3. Open in browser:
 
 ```text
-http://127.0.0.1:3000
+http://localhost:3000
 ```
 
-The app is served by Express at `http://127.0.0.1:3000`.
+The app is served by Express at `http://localhost:3000`.
 
 4. Verify health endpoint:
 
 ```text
-http://127.0.0.1:3000/health
+http://localhost:3000/health
 ```
 
 It should return `OK`.
@@ -114,7 +114,7 @@ These commands store PM2 runtime files in local `.pm2/` inside the project.
 Open:
 
 ```text
-http://127.0.0.1:3000
+http://localhost:3000
 ```
 
 Other PM2 controls:
@@ -150,7 +150,7 @@ If you want automatic recovery whenever the app goes down, start the watchdog on
 npm run guard:start
 ```
 
-The watchdog checks `http://127.0.0.1:3000` every few seconds and runs recovery automatically.
+The watchdog checks `http://localhost:3000` every few seconds and runs recovery automatically.
 
 Check watchdog status:
 
@@ -198,7 +198,7 @@ npm run open
 
 ## Connection Troubleshooting
 
-- Use the full URL with port: `http://127.0.0.1:3000` (not just `127.0.0.1`).
+- Use the full URL with port: `http://localhost:3000` (not just `localhost`).
 - Run commands from the project folder that contains `package.json`.
 - Check status:
 
@@ -262,7 +262,7 @@ npm run dev
 5. Open the AI page:
 
 ```text
-http://127.0.0.1:3000/agent
+http://localhost:3000/agent
 ```
 
 6. Enter a natural language instruction, click **Create appointment**, review the parsed preview, then click **Save it**.
@@ -270,7 +270,7 @@ http://127.0.0.1:3000/agent
 ## Quick Add Verification Checklist
 
 - Start server: `npm run dev`
-- Open home page: `http://127.0.0.1:3000/`
+- Open home page: `http://localhost:3000/`
 - In **Quick Add**, enter: `Dentist tomorrow 3pm`
 - Click **Create** and confirm preview renders on `/agent`
 - Click **Save it** and confirm the appointment appears on `/`
@@ -292,14 +292,14 @@ http://127.0.0.1:3000/agent
 - Add test user(s) if the app is still in testing mode
 - Create an OAuth Client ID (Web application)
 - Add redirect URI:
-  - `http://127.0.0.1:3000/auth/google/callback`
+  - `http://localhost:3000/auth/google/callback`
 
 2. Set environment variables in `.env`:
 
 ```bash
 GOOGLE_CLIENT_ID=your_client_id
 GOOGLE_CLIENT_SECRET=your_client_secret
-GOOGLE_REDIRECT_URI=http://127.0.0.1:3000/auth/google/callback
+GOOGLE_REDIRECT_URI=http://localhost:3000/auth/google/callback
 ```
 
 3. Start the app:
@@ -361,9 +361,10 @@ Optional Twilio Console check:
 
 7. Quick verification checklist (Windows):
 - Start server: `npm run dev`
-- Confirm health: `http://127.0.0.1:3000/health`
+- Confirm health: `http://localhost:3000/health`
 - Start tunnel: `cloudflared tunnel --url http://localhost:3000`
 - Update `.env` with `PUBLIC_BASE_URL` from tunnel and restart app
 - Add an appointment within the next hour
-- Wait for 60-minute and 30-minute marks (or run `http://127.0.0.1:3000/twilio/test-call?minutes=30` for a fast call test)
+- Wait for 60-minute and 30-minute marks (or run `http://localhost:3000/twilio/test-call?minutes=30` for a fast call test)
 # appointment-vault
+

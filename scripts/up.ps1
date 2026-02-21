@@ -8,7 +8,7 @@ $stderrLog = Join-Path $dataDir "server.err.log"
 
 New-Item -ItemType Directory -Path $dataDir -Force | Out-Null
 
-$bindHost = if ($env:APP_HOST) { $env:APP_HOST } else { "127.0.0.1" }
+$bindHost = if ($env:APP_HOST) { $env:APP_HOST } else { "localhost" }
 $port = 3000
 if ($env:APP_PORT) {
   $parsedPort = 0
@@ -110,3 +110,4 @@ if (Test-Path $stderrLog) {
   Get-Content $stderrLog -Tail 20
 }
 Write-Error "Startup failed. Try: npm run dev"
+

@@ -12,7 +12,7 @@ $recoveryStderr = Join-Path $dataDir "watchdog-recovery.err.log"
 
 New-Item -ItemType Directory -Path $dataDir -Force | Out-Null
 
-$bindHost = if ($env:APP_HOST) { $env:APP_HOST } else { "127.0.0.1" }
+$bindHost = if ($env:APP_HOST) { $env:APP_HOST } else { "localhost" }
 $port = 3000
 if ($env:APP_PORT) {
   $parsedPort = 0
@@ -118,3 +118,4 @@ try {
 
   Write-WatchdogLog "Watchdog stopped (pid $PID)."
 }
+
