@@ -22,6 +22,19 @@ require("dotenv").config({ quiet: true });
 
 const app = express();
 const SESSION_SECRET = process.env.SESSION_SECRET || "appointment-vault-session-secret-change-me";
+function resolveAppTimezone() {
+  const candidate =
+    String(process.env.APP_TIMEZONE || process.env.TZ || "America/Los_Angeles").trim() ||
+    "America/Los_Angeles";
+  try {
+    new Intl.DateTimeFormat("en-US", { timeZone: candidate });
+    return candidate;
+  } catch (error) {
+    return "America/Los_Angeles";
+  }
+}
+
+const APP_TIMEZONE = resolveAppTimezone();
 const GOOGLE_TOKENS_SETTING_KEY = "google.tokens";
 const selectAppSettingStatement = db.prepare("SELECT value FROM app_settings WHERE key = ?");
 const upsertAppSettingStatement = db.prepare(`
@@ -223,22 +236,39 @@ function parseId(idValue) {
 function getQuickAddDefaults() {
   const now = new Date();
   const plusOneHour = new Date(now.getTime() + 60 * 60 * 1000);
-  const pad = (value) => String(value).padStart(2, "0");
+  return { date: formatLocalDate(now), time: formatLocalTime(plusOneHour) };
+}
+
+function formatInAppTimezoneParts(date) {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: APP_TIMEZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false
+  }).formatToParts(date);
 
   return {
-    date: `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`,
-    time: `${pad(plusOneHour.getHours())}:${pad(plusOneHour.getMinutes())}`
+    year: parts.find((part) => part.type === "year")?.value || "0000",
+    month: parts.find((part) => part.type === "month")?.value || "01",
+    day: parts.find((part) => part.type === "day")?.value || "01",
+    hour: parts.find((part) => part.type === "hour")?.value || "00",
+    minute: parts.find((part) => part.type === "minute")?.value || "00",
+    second: parts.find((part) => part.type === "second")?.value || "00"
   };
 }
 
 function formatLocalDate(date) {
-  const pad = (value) => String(value).padStart(2, "0");
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+  const parts = formatInAppTimezoneParts(date);
+  return `${parts.year}-${parts.month}-${parts.day}`;
 }
 
 function formatLocalTime(date) {
-  const pad = (value) => String(value).padStart(2, "0");
-  return `${pad(date.getHours())}:${pad(date.getMinutes())}`;
+  const parts = formatInAppTimezoneParts(date);
+  return `${parts.hour}:${parts.minute}`;
 }
 
 function formatDisplayTime(timeValue) {
@@ -351,7 +381,31 @@ function parseAppointmentDateTime(appointment) {
     return null;
   }
 
-  const parsed = new Date(`${appointment.date}T${appointment.time}:00`);
+  const [year, month, day] = String(appointment.date).split("-").map(Number);
+  const [hour, minute] = String(appointment.time).split(":").map(Number);
+  if (
+    !Number.isInteger(year) ||
+    !Number.isInteger(month) ||
+    !Number.isInteger(day) ||
+    !Number.isInteger(hour) ||
+    !Number.isInteger(minute)
+  ) {
+    return null;
+  }
+
+  const utcGuess = Date.UTC(year, month - 1, day, hour, minute, 0);
+  const offsetBaseDate = new Date(utcGuess);
+  const parts = formatInAppTimezoneParts(offsetBaseDate);
+  const asIfUtc = Date.UTC(
+    Number.parseInt(parts.year, 10),
+    Number.parseInt(parts.month, 10) - 1,
+    Number.parseInt(parts.day, 10),
+    Number.parseInt(parts.hour, 10),
+    Number.parseInt(parts.minute, 10),
+    Number.parseInt(parts.second, 10)
+  );
+  const offsetMs = asIfUtc - utcGuess;
+  const parsed = new Date(utcGuess - offsetMs);
   if (Number.isNaN(parsed.getTime())) {
     return null;
   }
