@@ -422,6 +422,22 @@ app.get("/health", (req, res) => {
 app.post("/twilio/voice", (req, res) => {
   const VoiceResponse = require("twilio").twiml.VoiceResponse;
   const twiml = new VoiceResponse();
+  const requestedId = parseId(req.query.appointmentId || req.body.appointmentId);
+  const now = new Date();
+  const todayDate = formatLocalDate(now);
+  const nowTime = formatLocalTime(now);
+  const appointments = requestedId
+    ? (() => {
+      const appointment = getAppointmentById(requestedId);
+      return appointment ? [appointment] : [];
+    })()
+    : db.prepare(
+      `SELECT id, title, date, time
+       FROM appointments
+       WHERE date > ?
+          OR (date = ? AND time >= ?)
+       ORDER BY date ASC, time ASC, id ASC`
+    ).all(todayDate, todayDate, nowTime);
 
   if (!appointments.length) {
     twiml.say("You have no upcoming appointments.");
@@ -431,7 +447,6 @@ app.post("/twilio/voice", (req, res) => {
   const upcoming = appointments[0]; // assumes first is next appointment
 
   const appointmentDateTime = new Date(`${upcoming.date}T${upcoming.time}`);
-  const now = new Date();
 
   const diffMs = appointmentDateTime - now;
   const diffMinutes = Math.max(Math.round(diffMs / 60000), 0);
