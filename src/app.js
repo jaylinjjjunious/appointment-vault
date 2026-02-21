@@ -1100,7 +1100,7 @@ app.post("/appointments/:id/delete", async (req, res, next) => {
   }
 });
 
-app.post("/appointments/:id/complete", (req, res, next) => {
+function completeAppointment(req, res, next) {
   try {
     const id = parseId(req.params.id);
     if (!id) {
@@ -1135,6 +1135,20 @@ app.post("/appointments/:id/complete", (req, res, next) => {
   } catch (error) {
     next(error);
   }
+}
+
+app.all(/^\/appointments\/([^/]+)\/complete\/?$/i, (req, res, next) => {
+  if (req.method !== "GET" && req.method !== "POST") {
+    res.status(405).send("Method Not Allowed");
+    return;
+  }
+
+  req.params = {
+    ...(req.params || {}),
+    id: req.params?.id || req.params?.[0]
+  };
+
+  completeAppointment(req, res, next);
 });
 
 app.use((req, res) => {
