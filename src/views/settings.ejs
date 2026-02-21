@@ -129,7 +129,8 @@
       setOpen(true);
     });
 
-    closeButton.addEventListener("click", () => {
+    closeButton.addEventListener("click", (event) => {
+      event.preventDefault();
       setOpen(false);
     });
 
@@ -144,6 +145,12 @@
         setOpen(false);
       }
     });
+
+    window.addEventListener("pageshow", () => {
+      setOpen(false);
+    });
+
+    setOpen(false);
   })();
 </script>
 
