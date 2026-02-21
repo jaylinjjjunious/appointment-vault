@@ -19,6 +19,7 @@
         <nav class="nav-links">
           <a class="button glass-button button-secondary" href="/appointments/new">Add Appointment</a>
           <a class="button glass-button button-secondary" href="/agent">AI Quick Add</a>
+          <a class="button glass-button button-secondary" href="/settings">Settings</a>
           <% if (isGoogleConfigured) { %>
             <% if (isGoogleConnected) { %>
               <form class="inline-nav-form" action="/auth/google/disconnect" method="POST">

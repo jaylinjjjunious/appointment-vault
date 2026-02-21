@@ -258,6 +258,13 @@ function getTodayDateString() {
   return formatLocalDate(new Date());
 }
 
+function isPastAppointment(appointment, todayDate, nowTime) {
+  return (
+    appointment.date < todayDate ||
+    (appointment.date === todayDate && appointment.time < nowTime)
+  );
+}
+
 function applyAgentDefaults(input) {
   const withDefaults = { ...input };
 
@@ -498,15 +505,18 @@ app.get("/", (req, res) => {
       .map((appointment) => ({
         ...appointment,
         tagList: tagsToArray(appointment.tags),
-        isCompleted: appointment.date === todayDate && appointment.time < nowTime
+        isPast: isPastAppointment(appointment, todayDate, nowTime),
+        isCompleted: isPastAppointment(appointment, todayDate, nowTime)
       }));
 
     const todayAppointments = appointments.filter(
-      (appointment) => appointment.date === todayDate
+      (appointment) => appointment.date === todayDate && appointment.time >= nowTime
     );
     const thisWeekAppointments = appointments.filter(
       (appointment) =>
-        appointment.date >= todayDate && appointment.date <= endOfWeekDate
+        !appointment.isPast &&
+        appointment.date >= todayDate &&
+        appointment.date <= endOfWeekDate
     );
     const upcomingAppointments = appointments.filter(
       (appointment) => appointment.date > endOfWeekDate
@@ -535,6 +545,41 @@ app.get("/", (req, res) => {
       ...viewModel,
       googleStatusMessage: "Unable to load appointments right now."
     });
+  }
+});
+
+app.get("/settings", (req, res, next) => {
+  try {
+    const now = new Date();
+    const todayDate = formatLocalDate(now);
+    const nowTime = formatLocalTime(now);
+    const historyAppointments = db
+      .prepare("SELECT * FROM appointments ORDER BY date ASC, time ASC, id ASC")
+      .all()
+      .map((appointment) => ({
+        ...appointment,
+        tagList: tagsToArray(appointment.tags),
+        isPast: isPastAppointment(appointment, todayDate, nowTime)
+      }))
+      .filter((appointment) => appointment.isPast)
+      .sort((left, right) => {
+        if (left.date !== right.date) {
+          return right.date.localeCompare(left.date);
+        }
+
+        if (left.time !== right.time) {
+          return right.time.localeCompare(left.time);
+        }
+
+        return right.id - left.id;
+      });
+
+    res.render("settings", {
+      title: "Settings",
+      historyAppointments
+    });
+  } catch (error) {
+    next(error);
   }
 });
 
