@@ -21,9 +21,6 @@ const {
 require("dotenv").config({ quiet: true });
 
 const app = express();
-const parsedPort = Number.parseInt(process.env.APP_PORT || process.env.PORT || "", 10);
-const PORT = Number.isInteger(parsedPort) && parsedPort > 0 ? parsedPort : 3000;
-const HOST = process.env.APP_HOST || "127.0.0.1";
 const SESSION_SECRET = process.env.SESSION_SECRET || "appointment-vault-session-secret-change-me";
 
 app.set("view engine", "ejs");
@@ -829,8 +826,10 @@ app.use((error, req, res, next) => {
   });
 });
 
-const server = app.listen(PORT, HOST, () => {
-  console.log(`Appointment Vault is running on http://${HOST}:${PORT}`);
+const PORT = process.env.PORT || 3000;
+
+const server = app.listen(PORT, "0.0.0.0", () => {
+  console.log(`Appointment Vault listening on ${PORT}`);
   logTwilioEnvStatus();
   startReminderScheduler();
 });
