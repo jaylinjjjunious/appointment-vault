@@ -120,16 +120,6 @@
       }
     };
 
-    const applyHistoryQueryState = (isOpen) => {
-      const url = new URL(window.location.href);
-      if (isOpen) {
-        url.searchParams.set("history", "open");
-      } else {
-        url.searchParams.delete("history");
-      }
-      window.history.replaceState({}, "", url);
-    };
-
     openButton.addEventListener("click", (event) => {
       if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
         return;
@@ -137,36 +127,30 @@
 
       event.preventDefault();
       setOpen(true);
-      applyHistoryQueryState(true);
     });
 
     closeButton.addEventListener("click", (event) => {
       event.preventDefault();
       setOpen(false);
-      applyHistoryQueryState(false);
     });
 
     modal.addEventListener("click", (event) => {
       if (event.target === modal) {
         setOpen(false);
-        applyHistoryQueryState(false);
       }
     });
 
     document.addEventListener("keydown", (event) => {
       if (event.key === "Escape" && !modal.hidden) {
         setOpen(false);
-        applyHistoryQueryState(false);
       }
     });
 
     window.addEventListener("pageshow", () => {
-      const params = new URLSearchParams(window.location.search);
-      setOpen(params.get("history") === "open");
+      setOpen(false);
     });
 
-    const params = new URLSearchParams(window.location.search);
-    setOpen(params.get("history") === "open");
+    setOpen(false);
   })();
 </script>
 
