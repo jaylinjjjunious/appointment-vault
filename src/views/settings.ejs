@@ -21,11 +21,25 @@
     typeof historyAppointments !== "undefined" && Array.isArray(historyAppointments)
       ? historyAppointments
       : [];
+  const safeCallStatus = typeof callStatus === "string" ? callStatus : "";
+  const safeCallStatusMessage = typeof callStatusMessage === "string" ? callStatusMessage : "";
 %>
 
 <section class="page-heading">
   <h1>Settings</h1>
   <p>Past appointments are automatically moved into History.</p>
+</section>
+
+<section class="calendar-section glass-panel">
+  <h2>Call Test</h2>
+  <p class="section-empty">Use this button to place a live Twilio test call.</p>
+  <form class="actions" action="/settings/test-call" method="POST">
+    <input type="hidden" name="minutes" value="30" />
+    <button class="button glass-button" type="submit">Test Call</button>
+  </form>
+  <% if (safeCallStatusMessage) { %>
+    <p class="<%= safeCallStatus === 'error' ? 'error-text' : '' %>"><%= safeCallStatusMessage %></p>
+  <% } %>
 </section>
 
 <section class="calendar-section glass-panel">

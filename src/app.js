@@ -258,6 +258,25 @@ function getTodayDateString() {
   return formatLocalDate(new Date());
 }
 
+function getUpcomingAppointmentForCall(requestedId) {
+  if (requestedId) {
+    return getAppointmentById(requestedId);
+  }
+
+  const now = new Date();
+  const todayDate = formatLocalDate(now);
+  const nowTime = formatLocalTime(now);
+
+  return db.prepare(
+    `SELECT id, title, date, time
+     FROM appointments
+     WHERE date > ?
+        OR (date = ? AND time >= ?)
+     ORDER BY date ASC, time ASC, id ASC
+     LIMIT 1`
+  ).get(todayDate, todayDate, nowTime);
+}
+
 function isPastAppointment(appointment, todayDate, nowTime) {
   return (
     appointment.date < todayDate ||
@@ -477,15 +496,7 @@ app.get("/twilio/test-call", async (req, res) => {
   }
 
   const requestedId = parseId(req.query.appointmentId);
-  const appointment = requestedId
-    ? getAppointmentById(requestedId)
-    : db.prepare(
-      `SELECT id, title, date, time
-       FROM appointments
-       WHERE date >= ?
-       ORDER BY date ASC, time ASC, id ASC
-       LIMIT 1`
-    ).get(getTodayDateString());
+  const appointment = getUpcomingAppointmentForCall(requestedId);
   const targetAppointmentId = appointment?.id ?? null;
 
   try {
@@ -504,6 +515,35 @@ app.get("/twilio/test-call", async (req, res) => {
       ok: false,
       message: error?.message || "Unable to place test call."
     });
+  }
+});
+
+app.post("/settings/test-call", async (req, res) => {
+  const minutesRaw = Number.parseInt(String(req.body.minutes || "30"), 10);
+  const minutesOffset = [30, 60].includes(minutesRaw) ? minutesRaw : 30;
+  const requestedId = parseId(req.body.appointmentId || req.query.appointmentId);
+  const appointment = getUpcomingAppointmentForCall(requestedId);
+  const targetAppointmentId = appointment?.id ?? null;
+
+  try {
+    const call = await triggerTestCall(targetAppointmentId, minutesOffset);
+    const query = new URLSearchParams({
+      call: "success",
+      callSid: String(call.sid || ""),
+      minutes: String(minutesOffset)
+    });
+
+    if (targetAppointmentId) {
+      query.set("appointmentId", String(targetAppointmentId));
+    }
+
+    res.redirect(`/settings?${query.toString()}`);
+  } catch (error) {
+    const query = new URLSearchParams({
+      call: "error",
+      error: String(error?.message || "Unable to place test call.")
+    });
+    res.redirect(`/settings?${query.toString()}`);
   }
 });
 
@@ -598,9 +638,19 @@ function renderSettingsPage(req, res, next) {
         return right.id - left.id;
       });
 
+    const callStatus = String(req.query.call || "");
+    const callStatusMessage =
+      callStatus === "success"
+        ? `Test call placed. Call SID: ${String(req.query.callSid || "n/a")}`
+        : callStatus === "error"
+          ? `Test call failed: ${String(req.query.error || "Unknown error")}`
+          : "";
+
     res.render("settings", {
       title: "Settings",
-      historyAppointments
+      historyAppointments,
+      callStatus,
+      callStatusMessage
     });
   } catch (error) {
     next(error);
