@@ -713,6 +713,11 @@ app.get("/", (req, res) => {
 
 function renderSettingsPage(req, res, next) {
   try {
+    if (/^\/settings\/history\/?$/i.test(String(req.path || ""))) {
+      renderSettingsHistoryPage(req, res, next);
+      return;
+    }
+
     const historyAppointments = getHistoryAppointments();
 
     const callStatus = String(req.query.call || "");
