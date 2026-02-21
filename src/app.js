@@ -22,6 +22,16 @@ require("dotenv").config({ quiet: true });
 
 const app = express();
 const SESSION_SECRET = process.env.SESSION_SECRET || "appointment-vault-session-secret-change-me";
+const GOOGLE_TOKENS_SETTING_KEY = "google.tokens";
+const selectAppSettingStatement = db.prepare("SELECT value FROM app_settings WHERE key = ?");
+const upsertAppSettingStatement = db.prepare(`
+  INSERT INTO app_settings (key, value, updatedAt)
+  VALUES (@key, @value, @updatedAt)
+  ON CONFLICT(key) DO UPDATE SET
+    value = excluded.value,
+    updatedAt = excluded.updatedAt
+`);
+const deleteAppSettingStatement = db.prepare("DELETE FROM app_settings WHERE key = ?");
 
 app.set("view engine", "ejs");
 app.set("views", path.join(__dirname, "views"));
@@ -40,6 +50,16 @@ app.use(
     }
   })
 );
+app.use((req, res, next) => {
+  if (!isGoogleConnected(req.session)) {
+    const persistedTokens = getPersistedGoogleTokens();
+    if (persistedTokens) {
+      setGoogleTokensOnSession(req.session, persistedTokens);
+    }
+  }
+
+  next();
+});
 app.use("/public", express.static(path.join(__dirname, "public")));
 app.use((req, res, next) => {
   res.locals.googleConfigured = hasGoogleConfig();
@@ -47,6 +67,44 @@ app.use((req, res, next) => {
   res.locals.formatDisplayTime = formatDisplayTime;
   next();
 });
+
+function getPersistedGoogleTokens() {
+  const row = selectAppSettingStatement.get(GOOGLE_TOKENS_SETTING_KEY);
+  if (!row?.value) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(row.value);
+    if (
+      parsed &&
+      typeof parsed === "object" &&
+      (parsed.access_token || parsed.refresh_token)
+    ) {
+      return parsed;
+    }
+  } catch (error) {
+    console.error("Failed to parse persisted Google tokens:", error.message);
+  }
+
+  return null;
+}
+
+function persistGoogleTokens(tokens) {
+  if (!tokens || (!tokens.access_token && !tokens.refresh_token)) {
+    return;
+  }
+
+  upsertAppSettingStatement.run({
+    key: GOOGLE_TOKENS_SETTING_KEY,
+    value: JSON.stringify(tokens),
+    updatedAt: new Date().toISOString()
+  });
+}
+
+function clearPersistedGoogleTokens() {
+  deleteAppSettingStatement.run(GOOGLE_TOKENS_SETTING_KEY);
+}
 
 function isValidDateString(value) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
@@ -332,6 +390,7 @@ app.get("/auth/google/callback", async (req, res, next) => {
   try {
     const tokens = await exchangeCodeForTokens(code);
     setGoogleTokensOnSession(req.session, tokens);
+    persistGoogleTokens(req.session.googleTokens || tokens);
     res.redirect("/?google=connected");
   } catch (error) {
     if (error instanceof GoogleCalendarError) {
@@ -345,6 +404,7 @@ app.get("/auth/google/callback", async (req, res, next) => {
 
 app.post("/auth/google/disconnect", (req, res) => {
   clearGoogleSession(req.session);
+  clearPersistedGoogleTokens();
   res.redirect("/?google=disconnected");
 });
 
@@ -583,6 +643,7 @@ app.post("/agent/save", async (req, res, next) => {
         const appointment = getAppointmentById(Number(insertInfo.lastInsertRowid));
         if (appointment) {
           await createGoogleEventFromSession(req.session, appointment);
+          persistGoogleTokens(req.session.googleTokens);
         }
       }
     } catch (error) {
@@ -658,6 +719,7 @@ app.post("/appointments", async (req, res, next) => {
         const appointment = getAppointmentById(Number(insertInfo.lastInsertRowid));
         if (appointment) {
           await createGoogleEventFromSession(req.session, appointment);
+          persistGoogleTokens(req.session.googleTokens);
         }
       }
     } catch (error) {

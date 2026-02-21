@@ -54,4 +54,12 @@ db.exec(`
   ON reminder_calls (appointmentId, remindAt)
 `);
 
+db.exec(`
+  CREATE TABLE IF NOT EXISTS app_settings (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL,
+    updatedAt TEXT NOT NULL
+  )
+`);
+
 module.exports = db;
