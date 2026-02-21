@@ -33,6 +33,10 @@
       : safeTodayAppointments.length === 0 && safeThisWeekAppointments.length === 0
         ? fallbackAppointments
         : [];
+  const safeTestProfileActive =
+    typeof testProfileActive !== "undefined" ? testProfileActive : false;
+  const safeTestProfile =
+    typeof testProfile !== "undefined" && testProfile ? testProfile : null;
 %>
 
 <section class="page-heading">
@@ -67,7 +71,14 @@
   </section>
 <% } %>
 
-<% if (!googleConfigured) { %>
+<% if (safeTestProfileActive && safeTestProfile) { %>
+  <section class="card glass-panel status-card">
+    <p>
+      <strong>Temporary Test Profile:</strong>
+      <%= safeTestProfile.name %> (<%= safeTestProfile.email %>)
+    </p>
+  </section>
+<% } else if (!googleConfigured) { %>
   <section class="card glass-panel status-card warning-card">
     <p>Google Calendar OAuth is not configured yet. Add the required Google env values.</p>
   </section>

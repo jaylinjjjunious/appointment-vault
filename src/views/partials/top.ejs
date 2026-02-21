@@ -3,6 +3,10 @@
     typeof googleConfigured !== "undefined" ? googleConfigured : false;
   const isGoogleConnected =
     typeof googleConnected !== "undefined" ? googleConnected : false;
+  const isTestProfileActive =
+    typeof testProfileActive !== "undefined" ? testProfileActive : false;
+  const activeTestProfile =
+    typeof testProfile !== "undefined" && testProfile ? testProfile : null;
 %>
 <!DOCTYPE html>
 <html lang="en">
@@ -21,7 +25,11 @@
           <a class="button glass-button button-secondary" href="/appointments/new">Add Appointment</a>
           <a class="button glass-button button-secondary" href="/agent">AI Quick Add</a>
           <a class="button glass-button button-secondary" href="/settings">Settings</a>
-          <% if (isGoogleConfigured) { %>
+          <% if (isTestProfileActive && activeTestProfile) { %>
+            <span class="test-profile-badge">
+              Test: <%= activeTestProfile.name %>
+            </span>
+          <% } else if (isGoogleConfigured) { %>
             <% if (isGoogleConnected) { %>
               <form class="inline-nav-form" action="/auth/google/disconnect" method="POST">
                 <button class="button glass-button button-secondary" type="submit">Disconnect Google</button>

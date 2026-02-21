@@ -23,6 +23,15 @@ require("dotenv").config({ quiet: true });
 const app = express();
 const SESSION_SECRET = process.env.SESSION_SECRET || "appointment-vault-session-secret-change-me";
 const IS_PRODUCTION = process.env.NODE_ENV === "production";
+const TEST_PROFILE_ENABLED = !["0", "false", "off", "no"].includes(
+  String(process.env.TEMP_TEST_PROFILE || "true")
+    .trim()
+    .toLowerCase()
+);
+const TEST_PROFILE_NAME =
+  String(process.env.TEST_PROFILE_NAME || "").trim() || "Temporary Test Profile";
+const TEST_PROFILE_EMAIL =
+  String(process.env.TEST_PROFILE_EMAIL || "").trim() || "test-profile@appointment-vault.local";
 
 if (IS_PRODUCTION) {
   app.set("trust proxy", 1);
@@ -70,6 +79,17 @@ app.use(
   })
 );
 app.use((req, res, next) => {
+  if (TEST_PROFILE_ENABLED) {
+    req.session.testProfile = {
+      name: TEST_PROFILE_NAME,
+      email: TEST_PROFILE_EMAIL,
+      role: "tester"
+    };
+  }
+
+  next();
+});
+app.use((req, res, next) => {
   const persistedTokens = getPersistedGoogleTokens();
   if (!isGoogleConnected(req.session) && persistedTokens) {
     setGoogleTokensOnSession(req.session, persistedTokens);
@@ -80,9 +100,16 @@ app.use((req, res, next) => {
 });
 app.use("/public", express.static(path.join(__dirname, "public")));
 app.use((req, res, next) => {
-  res.locals.googleConfigured = hasGoogleConfig();
-  res.locals.googleConnected =
+  const hasRealGoogleConnection =
     isGoogleConnected(req.session) || Boolean(req.persistedGoogleTokens);
+  const testProfile = req.session?.testProfile || null;
+  const testProfileActive = Boolean(TEST_PROFILE_ENABLED && testProfile);
+
+  res.locals.googleConfigured = hasGoogleConfig() || testProfileActive;
+  res.locals.googleConnected =
+    hasRealGoogleConnection || testProfileActive;
+  res.locals.testProfileActive = testProfileActive;
+  res.locals.testProfile = testProfile;
   res.locals.formatDisplayTime = formatDisplayTime;
   next();
 });
@@ -520,6 +547,11 @@ function buildTodayVoiceMessage(requestedAppointmentId, now = new Date()) {
 }
 
 app.get("/auth/google", (req, res, next) => {
+  if (TEST_PROFILE_ENABLED) {
+    res.redirect("/?google=test_profile");
+    return;
+  }
+
   if (!hasGoogleConfig()) {
     res.status(400).render("error", {
       title: "Google Not Configured",
@@ -560,6 +592,11 @@ app.get("/auth/google/callback", async (req, res, next) => {
 });
 
 app.post("/auth/google/disconnect", (req, res) => {
+  if (TEST_PROFILE_ENABLED) {
+    res.redirect("/?google=test_profile");
+    return;
+  }
+
   clearGoogleSession(req.session);
   clearPersistedGoogleTokens();
   res.redirect("/?google=disconnected");
@@ -690,6 +727,8 @@ app.get("/", (req, res) => {
         ? "Google Calendar connected."
         : req.query.google === "disconnected"
           ? "Google Calendar disconnected."
+          : req.query.google === "test_profile"
+            ? "Temporary test profile is active. Google sign-in is bypassed."
           : req.query.google === "auth_error"
             ? "Google sign-in failed. Please try connecting again."
             : "";

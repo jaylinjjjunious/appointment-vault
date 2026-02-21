@@ -6,12 +6,25 @@
       : [];
   const safeCallStatus = typeof callStatus === "string" ? callStatus : "";
   const safeCallStatusMessage = typeof callStatusMessage === "string" ? callStatusMessage : "";
+  const safeTestProfileActive =
+    typeof testProfileActive !== "undefined" ? testProfileActive : false;
+  const safeTestProfile =
+    typeof testProfile !== "undefined" && testProfile ? testProfile : null;
 %>
 
 <section class="page-heading">
   <h1>Settings</h1>
   <p>Past appointments are automatically moved into History.</p>
 </section>
+
+<% if (safeTestProfileActive && safeTestProfile) { %>
+  <section class="calendar-section glass-panel">
+    <h2>Temporary Test Profile</h2>
+    <p><strong>Name:</strong> <%= safeTestProfile.name %></p>
+    <p><strong>Email:</strong> <%= safeTestProfile.email %></p>
+    <p class="section-empty">This test profile auto-signs in on every page load.</p>
+  </section>
+<% } %>
 
 <section class="calendar-section glass-panel">
   <h2>Call Test</h2>

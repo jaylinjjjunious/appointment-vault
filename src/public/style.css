@@ -95,6 +95,18 @@ body {
   flex-wrap: wrap;
 }
 
+.test-profile-badge {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid #c7d2fe;
+  border-radius: var(--radius-pill);
+  background: #eef2ff;
+  color: #3730a3;
+  font-size: 0.82rem;
+  font-weight: 700;
+  padding: 0.45rem 0.75rem;
+}
+
 .inline-nav-form {
   margin: 0;
 }
