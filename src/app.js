@@ -486,22 +486,18 @@ app.get("/twilio/test-call", async (req, res) => {
        ORDER BY date ASC, time ASC, id ASC
        LIMIT 1`
     ).get(getTodayDateString());
-
-  if (!appointment) {
-    res.status(400).json({
-      ok: false,
-      message: "No appointment found. Pass appointmentId or create an appointment first."
-    });
-    return;
-  }
+  const targetAppointmentId = appointment?.id ?? null;
 
   try {
-    const call = await triggerTestCall(appointment.id, minutesOffset);
+    const call = await triggerTestCall(targetAppointmentId, minutesOffset);
     res.json({
       ok: true,
       callSid: call.sid,
-      appointmentId: appointment.id,
-      minutes: minutesOffset
+      appointmentId: targetAppointmentId,
+      minutes: minutesOffset,
+      message: appointment
+        ? "Test call placed for the selected appointment."
+        : "Test call placed with no upcoming appointment context."
     });
   } catch (error) {
     res.status(400).json({
