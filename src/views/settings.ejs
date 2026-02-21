@@ -1,22 +1,5 @@
 <%- include("partials/top", { title }) %>
 <%
-  const to12Hour =
-    typeof formatDisplayTime === "function"
-      ? formatDisplayTime
-      : (timeValue) => {
-        const value = String(timeValue ?? "").trim();
-        const match = /^([01]\d|2[0-3]):([0-5]\d)$/.exec(value);
-        if (!match) {
-          return value;
-        }
-
-        const hour24 = Number.parseInt(match[1], 10);
-        const minutes = match[2];
-        const meridiem = hour24 >= 12 ? "PM" : "AM";
-        const hour12 = hour24 % 12 === 0 ? 12 : hour24 % 12;
-        return `${hour12}:${minutes} ${meridiem}`;
-      };
-
   const safeHistoryAppointments =
     typeof historyAppointments !== "undefined" && Array.isArray(historyAppointments)
       ? historyAppointments
@@ -44,35 +27,13 @@
 
 <section class="calendar-section glass-panel">
   <h2>History</h2>
-  <% if (safeHistoryAppointments.length === 0) { %>
-    <p class="section-empty">No past appointments yet.</p>
-  <% } else { %>
-    <div class="list">
-      <% safeHistoryAppointments.forEach((appointment) => { %>
-        <article class="card glass-card appointment-card completed-card">
-          <div class="appointment-main">
-            <h3><strong><%= appointment.title %></strong></h3>
-            <p><strong>Date:</strong> <%= appointment.date %></p>
-            <p><strong>Time:</strong> <%= to12Hour(appointment.time) %></p>
-            <% if (appointment.location) { %>
-              <p><strong>Location:</strong> <%= appointment.location %></p>
-            <% } %>
-            <% if (appointment.reminderMinutes !== null) { %>
-              <p><strong>Reminder:</strong> <%= appointment.reminderMinutes %> min before</p>
-            <% } %>
-            <p class="completed-label">History</p>
-          </div>
-          <div class="actions">
-            <a class="button glass-button button-secondary" href="/appointments/<%= appointment.id %>">View</a>
-            <a class="button glass-button button-secondary" href="/appointments/<%= appointment.id %>/edit">Edit</a>
-            <form action="/appointments/<%= appointment.id %>/delete" method="POST">
-              <button class="button glass-button button-danger" type="submit">Delete</button>
-            </form>
-          </div>
-        </article>
-      <% }) %>
-    </div>
-  <% } %>
+  <p class="section-empty">
+    Click below to open your full history log.
+    <% if (safeHistoryAppointments.length > 0) { %>
+      (<%= safeHistoryAppointments.length %> appointment<%= safeHistoryAppointments.length === 1 ? "" : "s" %>)
+    <% } %>
+  </p>
+  <a class="button glass-button button-secondary" href="/settings/history">View History Log</a>
 </section>
 
 <script src="/public/livePanelsRefresh.js"></script>

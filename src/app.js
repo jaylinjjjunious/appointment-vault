@@ -707,31 +707,7 @@ app.get("/", (req, res) => {
 
 function renderSettingsPage(req, res, next) {
   try {
-    const now = new Date();
-    const todayDate = formatLocalDate(now);
-    const nowTime = formatLocalTime(now);
-    const historyAppointments = db
-      .prepare("SELECT * FROM appointments ORDER BY date ASC, time ASC, id ASC")
-      .all()
-      .map((appointment) => ({
-        ...appointment,
-        tagList: tagsToArray(appointment.tags),
-        isPast: isPastAppointment(appointment, todayDate, nowTime),
-        isCompleted: isCompletedAppointment(appointment),
-        isHistory: isHistoryAppointment(appointment, todayDate, nowTime)
-      }))
-      .filter((appointment) => appointment.isHistory)
-      .sort((left, right) => {
-        if (left.date !== right.date) {
-          return right.date.localeCompare(left.date);
-        }
-
-        if (left.time !== right.time) {
-          return right.time.localeCompare(left.time);
-        }
-
-        return right.id - left.id;
-      });
+    const historyAppointments = getHistoryAppointments();
 
     const callStatus = String(req.query.call || "");
     const callStatusMessage =
@@ -752,9 +728,50 @@ function renderSettingsPage(req, res, next) {
   }
 }
 
+function getHistoryAppointments() {
+  const now = new Date();
+  const todayDate = formatLocalDate(now);
+  const nowTime = formatLocalTime(now);
+
+  return db
+    .prepare("SELECT * FROM appointments ORDER BY date ASC, time ASC, id ASC")
+    .all()
+    .map((appointment) => ({
+      ...appointment,
+      tagList: tagsToArray(appointment.tags),
+      isPast: isPastAppointment(appointment, todayDate, nowTime),
+      isCompleted: isCompletedAppointment(appointment),
+      isHistory: isHistoryAppointment(appointment, todayDate, nowTime)
+    }))
+    .filter((appointment) => appointment.isHistory)
+    .sort((left, right) => {
+      if (left.date !== right.date) {
+        return right.date.localeCompare(left.date);
+      }
+
+      if (left.time !== right.time) {
+        return right.time.localeCompare(left.time);
+      }
+
+      return right.id - left.id;
+    });
+}
+
+function renderSettingsHistoryPage(req, res, next) {
+  try {
+    res.render("settings-history", {
+      title: "History Log",
+      historyAppointments: getHistoryAppointments()
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
 app.get("/setting", (req, res) => {
   res.redirect("/settings");
 });
+app.get("/settings/history", renderSettingsHistoryPage);
 app.get(/^\/settings.*$/i, renderSettingsPage);
 
 app.get("/agent", (req, res) => {
