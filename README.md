@@ -366,3 +366,4 @@ Optional Twilio Console check:
 - Update `.env` with `PUBLIC_BASE_URL` from tunnel and restart app
 - Add an appointment within the next hour
 - Wait for 60-minute and 30-minute marks (or run `http://127.0.0.1:3000/twilio/test-call?minutes=30` for a fast call test)
+# appointment-vault
