@@ -24,6 +24,8 @@
   --shadow-sm: 0 8px 22px rgba(15, 23, 38, 0.08);
   --shadow-md: 0 18px 40px rgba(15, 23, 38, 0.12);
   --shadow-lg: 0 26px 56px rgba(15, 23, 38, 0.14);
+  --glass-blur: 24px;
+  --glass-sat: 168%;
 
   --radius-sm: 12px;
   --radius-md: 17px;
@@ -44,7 +46,7 @@ body {
   margin: 0;
   color: var(--text);
   background:
-    linear-gradient(180deg, rgba(238, 242, 248, 0.72) 0%, rgba(227, 233, 243, 0.8) 100%),
+    linear-gradient(180deg, rgba(237, 242, 249, 0.66) 0%, rgba(224, 231, 244, 0.76) 100%),
     radial-gradient(920px 560px at -10% -18%, var(--bg-accent-a), transparent 72%),
     radial-gradient(720px 560px at 112% -24%, var(--bg-accent-b), transparent 70%),
     url("/public/app-background.png") center center / cover no-repeat fixed,
@@ -52,11 +54,24 @@ body {
   font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Segoe UI", Roboto, Arial, sans-serif;
   font-size: 15px;
   line-height: 1.5;
+  position: relative;
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.08;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160' viewBox='0 0 160 160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.95' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E");
 }
 
 .container {
   width: min(960px, calc(100% - 2rem));
   margin: 0 auto;
+  position: relative;
+  z-index: 1;
 }
 
 .site-header {
@@ -76,8 +91,8 @@ body {
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-sm), inset 0 1px 0 rgba(255, 255, 255, 0.78);
-  backdrop-filter: blur(22px) saturate(160%);
-  -webkit-backdrop-filter: blur(22px) saturate(160%);
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-sat));
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-sat));
   padding: 0.7rem 0.9rem;
   position: relative;
   overflow: hidden;
@@ -149,11 +164,11 @@ body {
 .glass-panel,
 .card {
   background: linear-gradient(145deg, rgba(255, 255, 255, 0.44) 0%, rgba(255, 255, 255, 0.16) 100%);
-  border: 1px solid var(--border);
+  border: 1px solid rgba(255, 255, 255, 0.46);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-md), inset 0 1px 0 rgba(255, 255, 255, 0.78);
-  backdrop-filter: blur(24px) saturate(168%);
-  -webkit-backdrop-filter: blur(24px) saturate(168%);
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-sat));
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-sat));
   padding: 1.1rem;
   position: relative;
   overflow: hidden;
@@ -168,6 +183,16 @@ body {
   background:
     radial-gradient(145% 120% at -8% -30%, rgba(255, 255, 255, 0.56) 0%, transparent 57%),
     linear-gradient(145deg, rgba(255, 255, 255, 0.3) 0%, rgba(255, 255, 255, 0.08) 100%);
+}
+
+.glass-panel::after,
+.card::after {
+  content: "";
+  position: absolute;
+  inset: 1px;
+  border-radius: inherit;
+  pointer-events: none;
+  border: 1px solid rgba(255, 255, 255, 0.2);
 }
 
 .quick-add-card {
@@ -264,7 +289,7 @@ body {
 .glass-card,
 .appointment-card {
   background: linear-gradient(145deg, rgba(255, 255, 255, 0.42) 0%, rgba(243, 248, 255, 0.18) 100%);
-  border: 1px solid var(--border);
+  border: 1px solid rgba(255, 255, 255, 0.43);
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-sm);
   transition: transform 0.2s ease, box-shadow 0.2s ease;
@@ -281,8 +306,9 @@ body {
 }
 
 .appointment-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 16px 34px rgba(16, 26, 44, 0.12);
+  transform: translateY(-1px);
+  border-color: rgba(255, 255, 255, 0.58);
+  box-shadow: 0 14px 30px rgba(16, 26, 44, 0.11);
 }
 
 .appointment-main h2,
@@ -324,24 +350,25 @@ body {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border: 1px solid rgba(255, 255, 255, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.5);
   border-radius: var(--radius-pill);
   background: var(--primary);
   color: #fff;
   text-decoration: none;
   cursor: pointer;
   font-size: 0.92rem;
-  font-weight: 650;
+  font-weight: 600;
   padding: 0.56rem 0.98rem;
-  transition: background 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease, filter 0.2s ease;
+  transition: background 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease, filter 0.2s ease, border-color 0.2s ease;
   box-shadow: 0 10px 22px rgba(27, 93, 243, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.38);
 }
 
 .button:hover,
 .glass-button:hover {
   background: var(--primary-hover);
-  transform: translateY(-1px) scale(1.01);
-  filter: saturate(108%);
+  border-color: rgba(255, 255, 255, 0.62);
+  transform: translateY(-1px);
+  filter: saturate(106%);
 }
 
 .button:active,
@@ -389,7 +416,7 @@ body {
 .form-field textarea,
 .glass-input {
   width: 100%;
-  border: 1px solid rgba(255, 255, 255, 0.66);
+  border: 1px solid rgba(255, 255, 255, 0.6);
   border-radius: var(--radius-sm);
   background: linear-gradient(145deg, rgba(255, 255, 255, 0.84) 0%, rgba(255, 255, 255, 0.62) 100%);
   color: var(--text);
@@ -397,6 +424,24 @@ body {
   font-family: inherit;
   padding: 0.62rem 0.72rem;
   box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.58), 0 3px 8px rgba(13, 24, 42, 0.06);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+}
+
+.form-field input:hover,
+.form-field textarea:hover,
+.glass-input:hover {
+  border-color: rgba(255, 255, 255, 0.78);
+}
+
+.form-field input:focus,
+.form-field textarea:focus,
+.glass-input:focus {
+  border-color: rgba(130, 183, 255, 0.9);
+  box-shadow:
+    inset 0 1px 1px rgba(255, 255, 255, 0.72),
+    0 0 0 3px rgba(10, 111, 245, 0.18),
+    0 10px 20px rgba(15, 41, 92, 0.12);
+  outline: none;
 }
 
 .form-field textarea {
@@ -539,8 +584,8 @@ body {
   display: grid;
   gap: 0.7rem;
   background: linear-gradient(145deg, rgba(255, 255, 255, 0.52) 0%, rgba(255, 255, 255, 0.24) 100%);
-  backdrop-filter: blur(24px) saturate(170%);
-  -webkit-backdrop-filter: blur(24px) saturate(170%);
+  backdrop-filter: blur(calc(var(--glass-blur) + 2px)) saturate(172%);
+  -webkit-backdrop-filter: blur(calc(var(--glass-blur) + 2px)) saturate(172%);
   position: relative;
 }
 
@@ -581,8 +626,8 @@ button:focus-visible,
 input:focus-visible,
 textarea:focus-visible,
 summary:focus-visible {
-  outline: 2px solid var(--focus);
-  outline-offset: 2px;
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(10, 111, 245, 0.26);
 }
 
 @media (max-width: 780px) {
