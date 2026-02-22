@@ -46,7 +46,6 @@ body {
   margin: 0;
   color: var(--text);
   background:
-    linear-gradient(180deg, rgba(237, 242, 249, 0.66) 0%, rgba(224, 231, 244, 0.76) 100%),
     radial-gradient(920px 560px at -10% -18%, var(--bg-accent-a), transparent 72%),
     radial-gradient(720px 560px at 112% -24%, var(--bg-accent-b), transparent 70%),
     url("/public/app-background.png") center center / cover no-repeat fixed,
@@ -55,16 +54,6 @@ body {
   font-size: 15px;
   line-height: 1.5;
   position: relative;
-}
-
-body::before {
-  content: "";
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  z-index: 0;
-  opacity: 0.08;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160' viewBox='0 0 160 160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.95' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E");
 }
 
 .container {
