@@ -485,6 +485,10 @@ body {
   padding: 1rem;
 }
 
+.history-modal-backdrop[hidden] {
+  display: none !important;
+}
+
 .history-modal {
   width: min(860px, 100%);
   max-height: min(85vh, 760px);
