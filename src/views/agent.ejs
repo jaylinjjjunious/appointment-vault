@@ -65,6 +65,10 @@
       <p><strong>Time:</strong> <%= parsed.time ? to12Hour(parsed.time) : "Not set" %></p>
       <p><strong>Location:</strong> <%= parsed.location || "None" %></p>
       <p><strong>Reminder:</strong> <%= parsed.reminderMinutes === "" ? "None" : parsed.reminderMinutes + " min" %></p>
+      <p><strong>Recurring:</strong> <%= parsed.isRecurring ? "Yes" : "No" %></p>
+      <% if (parsed.isRecurring && parsed.rrule) { %>
+        <p><strong>RRULE:</strong> <code><%= parsed.rrule %></code></p>
+      <% } %>
       <p><strong>Tags:</strong> <%= parsed.tags || "None" %></p>
       <p class="preview-notes"><strong>Notes:</strong> <%= parsed.notes || "None" %></p>
     </div>
@@ -93,6 +97,32 @@
             <input id="time" class="glass-input" name="time" type="time" value="<%= parsed.time %>" required />
             <% if (saveErrors.time) { %><p class="field-error"><%= saveErrors.time %></p><% } %>
           </div>
+        </div>
+
+        <div class="form-field">
+          <label class="checkbox-field" for="isRecurring">
+            <input
+              id="isRecurring"
+              name="isRecurring"
+              type="checkbox"
+              value="true"
+              <%= parsed.isRecurring ? "checked" : "" %>
+            />
+            <span>Recurring appointment</span>
+          </label>
+        </div>
+
+        <div class="form-field">
+          <label for="rrule">RRULE</label>
+          <input
+            id="rrule"
+            class="glass-input"
+            name="rrule"
+            type="text"
+            value="<%= parsed.rrule || '' %>"
+            placeholder="FREQ=WEEKLY;INTERVAL=1;BYDAY=MO,WE,FR"
+          />
+          <% if (saveErrors.rrule) { %><p class="field-error"><%= saveErrors.rrule %></p><% } %>
         </div>
 
         <div class="form-field">

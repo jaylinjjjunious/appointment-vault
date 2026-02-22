@@ -28,6 +28,10 @@
   <p><strong>Time:</strong> <%= to12Hour(appointment.time) %></p>
   <p><strong>Location:</strong> <%= appointment.location || "Not provided" %></p>
   <p><strong>Reminder Minutes:</strong> <%= appointment.reminderMinutes ?? "Not set" %></p>
+  <p><strong>Recurring:</strong> <%= Number(appointment.isRecurring) === 1 ? "Yes" : "No" %></p>
+  <% if (Number(appointment.isRecurring) === 1 && appointment.rrule) { %>
+    <p><strong>RRULE:</strong> <code><%= appointment.rrule %></code></p>
+  <% } %>
 
   <% if (appointment.tagList.length > 0) { %>
     <div class="tag-group">
@@ -53,9 +57,19 @@
     <a class="button glass-button button-secondary" href="/">Back to List</a>
     <a class="button glass-button button-secondary" href="/appointments/<%= appointment.id %>/edit">Edit</a>
     <% if (!appointment.isHistory) { %>
-      <form action="/appointments/<%= appointment.id %>/complete" method="POST">
-        <button class="button glass-button" type="submit">Complete</button>
-      </form>
+      <% if (Number(appointment.isRecurring) === 1) { %>
+        <form action="/api/appointments/<%= appointment.id %>/complete-occurrence" method="POST">
+          <input type="hidden" name="occurrenceKey" value="<%= appointment.occurrenceKey %>" />
+          <button class="button glass-button" type="submit">Complete This Occurrence</button>
+        </form>
+        <form action="/api/appointments/<%= appointment.id %>/complete-series" method="POST">
+          <button class="button glass-button button-secondary" type="submit">Complete Entire Series</button>
+        </form>
+      <% } else { %>
+        <form action="/appointments/<%= appointment.id %>/complete" method="POST">
+          <button class="button glass-button" type="submit">Complete</button>
+        </form>
+      <% } %>
     <% } %>
     <form action="/appointments/<%= appointment.id %>/delete" method="POST">
       <button class="button glass-button button-danger" type="submit">Delete</button>

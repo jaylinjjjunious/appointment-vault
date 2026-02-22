@@ -45,11 +45,14 @@
             <% if (appointment.location) { %>
               <p><strong>Location:</strong> <%= appointment.location %></p>
             <% } %>
-            <% if (appointment.reminderMinutes !== null) { %>
-              <p><strong>Reminder:</strong> <%= appointment.reminderMinutes %> min before</p>
-            <% } %>
-            <p class="completed-label">History</p>
-          </div>
+              <% if (appointment.reminderMinutes !== null) { %>
+                <p><strong>Reminder:</strong> <%= appointment.reminderMinutes %> min before</p>
+              <% } %>
+              <% if (Number(appointment.isRecurring) === 1) { %>
+                <p><strong>Recurring:</strong> <code><%= appointment.rrule || "Yes" %></code></p>
+              <% } %>
+              <p class="completed-label">History</p>
+            </div>
           <div class="actions">
             <a class="button glass-button button-secondary" href="/appointments/<%= appointment.id %>">View</a>
             <a class="button glass-button button-secondary" href="/appointments/<%= appointment.id %>/edit">Edit</a>

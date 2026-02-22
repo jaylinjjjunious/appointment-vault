@@ -25,7 +25,10 @@
     "stable:delete": "set \"PM2_HOME=.pm2\"&& npx pm2 delete appointment-vault",
     "stable:status": "set \"PM2_HOME=.pm2\"&& npx pm2 status appointment-vault",
     "stable:logs": "set \"PM2_HOME=.pm2\"&& npx pm2 logs appointment-vault --lines 100",
-    "stable:save": "set \"PM2_HOME=.pm2\"&& npx pm2 save"
+    "stable:save": "set \"PM2_HOME=.pm2\"&& npx pm2 save",
+    "lint": "node scripts/lint-lite.js",
+    "test:smoke": "node scripts/smoke.js",
+    "qa": "npm run lint && npm run test:smoke"
   },
   "keywords": [
     "appointments",

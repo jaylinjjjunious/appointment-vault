@@ -10,12 +10,25 @@
     typeof testProfileActive !== "undefined" ? testProfileActive : false;
   const safeTestProfile =
     typeof testProfile !== "undefined" && testProfile ? testProfile : null;
+  const safeUser = typeof user !== "undefined" && user ? user : null;
+  const safeReminderActivity =
+    typeof reminderActivity !== "undefined" && reminderActivity && Array.isArray(reminderActivity.items)
+      ? reminderActivity
+      : { items: [], page: 1, pageSize: 20, total: 0 };
+  const safeReminderStatus = typeof reminderStatus === "string" ? reminderStatus : "";
+  const safeReminderChannel = typeof reminderChannel === "string" ? reminderChannel : "";
+  const hasSavedPrefs = String((typeof query !== "undefined" && query ? query.prefs : "") || "") === "saved";
 %>
 
 <section class="page-heading">
   <h1>Settings</h1>
   <p>Past appointments are automatically moved into History.</p>
 </section>
+<% if (hasSavedPrefs) { %>
+  <section class="card glass-panel status-card">
+    <p>Reminder settings saved.</p>
+  </section>
+<% } %>
 
 <% if (safeTestProfileActive && safeTestProfile) { %>
   <section class="calendar-section glass-panel">
@@ -27,6 +40,71 @@
 <% } %>
 
 <section class="calendar-section glass-panel">
+  <h2>Reminder Preferences</h2>
+  <p class="section-empty">Voice first, with SMS fallback if voice fails.</p>
+  <form class="form-grid" action="/settings/reminders" method="POST">
+    <div class="form-row">
+      <label class="checkbox-field" for="voiceEnabled">
+        <input
+          id="voiceEnabled"
+          name="voiceEnabled"
+          type="checkbox"
+          value="true"
+          <%= safeUser && Number(safeUser.voiceEnabled) === 1 ? "checked" : "" %>
+        />
+        <span>Enable Voice</span>
+      </label>
+      <label class="checkbox-field" for="smsEnabled">
+        <input
+          id="smsEnabled"
+          name="smsEnabled"
+          type="checkbox"
+          value="true"
+          <%= safeUser && Number(safeUser.smsEnabled) === 1 ? "checked" : "" %>
+        />
+        <span>Enable SMS fallback</span>
+      </label>
+    </div>
+    <div class="form-row">
+      <div class="form-field">
+        <label for="quietHoursStart">Quiet Hours Start</label>
+        <input
+          id="quietHoursStart"
+          class="glass-input"
+          name="quietHoursStart"
+          type="time"
+          value="<%= safeUser && safeUser.quietHoursStart ? safeUser.quietHoursStart : '' %>"
+        />
+      </div>
+      <div class="form-field">
+        <label for="quietHoursEnd">Quiet Hours End</label>
+        <input
+          id="quietHoursEnd"
+          class="glass-input"
+          name="quietHoursEnd"
+          type="time"
+          value="<%= safeUser && safeUser.quietHoursEnd ? safeUser.quietHoursEnd : '' %>"
+        />
+      </div>
+    </div>
+    <div class="form-field">
+      <label for="timezone">Timezone</label>
+      <input
+        id="timezone"
+        class="glass-input"
+        name="timezone"
+        type="text"
+        value="<%= safeUser && safeUser.timezone ? safeUser.timezone : 'America/Los_Angeles' %>"
+        placeholder="America/Los_Angeles"
+      />
+    </div>
+    <div class="actions">
+      <button class="button glass-button" type="submit">Save Reminder Settings</button>
+    </div>
+  </form>
+</section>
+
+<section class="calendar-section glass-panel">
   <h2>Call Test</h2>
   <p class="section-empty">Use this button to place a live Twilio test call.</p>
   <form class="actions" action="/settings/test-call" method="POST">
@@ -35,6 +113,58 @@
   </form>
   <% if (safeCallStatusMessage) { %>
     <p class="<%= safeCallStatus === 'error' ? 'error-text' : '' %>"><%= safeCallStatusMessage %></p>
+  <% } %>
+</section>
+
+<section class="calendar-section glass-panel">
+  <h2>Reminder Activity</h2>
+  <p class="section-empty">Latest delivery attempts, retries, and fallbacks.</p>
+  <form class="form-row" action="/settings" method="GET">
+    <div class="form-field">
+      <label for="statusFilter">Status</label>
+      <select id="statusFilter" class="glass-input" name="status">
+        <option value="" <%= !safeReminderStatus ? "selected" : "" %>>All</option>
+        <option value="queued" <%= safeReminderStatus === "queued" ? "selected" : "" %>>Queued</option>
+        <option value="calling" <%= safeReminderStatus === "calling" ? "selected" : "" %>>Calling</option>
+        <option value="voice_failed" <%= safeReminderStatus === "voice_failed" ? "selected" : "" %>>Voice Failed</option>
+        <option value="voice_no_answer" <%= safeReminderStatus === "voice_no_answer" ? "selected" : "" %>>No Answer</option>
+        <option value="sms_sent" <%= safeReminderStatus === "sms_sent" ? "selected" : "" %>>SMS Sent</option>
+        <option value="completed" <%= safeReminderStatus === "completed" ? "selected" : "" %>>Completed</option>
+      </select>
+    </div>
+    <div class="form-field">
+      <label for="channelFilter">Channel</label>
+      <select id="channelFilter" class="glass-input" name="channel">
+        <option value="" <%= !safeReminderChannel ? "selected" : "" %>>All</option>
+        <option value="voice" <%= safeReminderChannel === "voice" ? "selected" : "" %>>Voice</option>
+        <option value="sms" <%= safeReminderChannel === "sms" ? "selected" : "" %>>SMS</option>
+      </select>
+    </div>
+    <div class="actions">
+      <button class="button glass-button button-secondary" type="submit">Apply Filters</button>
+    </div>
+  </form>
+  <% if (safeReminderActivity.items.length === 0) { %>
+    <p class="section-empty">No reminder activity yet.</p>
+  <% } else { %>
+    <div class="list">
+      <% safeReminderActivity.items.forEach((item) => { %>
+        <article class="card glass-card appointment-card">
+          <div class="appointment-main">
+            <p><strong>Channel:</strong> <%= item.channel %></p>
+            <p><strong>Status:</strong> <%= item.status %></p>
+            <p><strong>Attempt #:</strong> <%= item.attemptNumber %></p>
+            <p><strong>Scheduled:</strong> <%= item.scheduledFor %></p>
+            <% if (item.providerSid) { %>
+              <p><strong>Provider SID:</strong> <%= item.providerSid %></p>
+            <% } %>
+            <% if (item.errorMessage) { %>
+              <p class="error-text"><strong>Error:</strong> <%= item.errorMessage %></p>
+            <% } %>
+          </div>
+        </article>
+      <% }) %>
+    </div>
   <% } %>
 </section>
 
@@ -85,6 +215,9 @@
               <% } %>
               <% if (appointment.reminderMinutes !== null) { %>
                 <p><strong>Reminder:</strong> <%= appointment.reminderMinutes %> min before</p>
+              <% } %>
+              <% if (Number(appointment.isRecurring) === 1) { %>
+                <p><strong>Recurring:</strong> <code><%= appointment.rrule || "Yes" %></code></p>
               <% } %>
               <p class="completed-label">History</p>
             </div>

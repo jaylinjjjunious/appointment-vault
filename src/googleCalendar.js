@@ -1,6 +1,11 @@
 const { google } = require("googleapis");
 
-const SCOPES = ["https://www.googleapis.com/auth/calendar"];
+const SCOPES = [
+  "openid",
+  "email",
+  "profile",
+  "https://www.googleapis.com/auth/calendar"
+];
 
 class GoogleCalendarError extends Error {
   constructor(message) {
@@ -77,6 +82,49 @@ function getGoogleAuthUrl() {
     prompt: "consent",
     include_granted_scopes: true
   });
+}
+
+function parseJwtPayload(token) {
+  const value = String(token || "").trim();
+  if (!value.includes(".")) {
+    return null;
+  }
+
+  const segments = value.split(".");
+  if (segments.length < 2) {
+    return null;
+  }
+
+  try {
+    const payloadSegment = segments[1]
+      .replace(/-/g, "+")
+      .replace(/_/g, "/")
+      .padEnd(Math.ceil(segments[1].length / 4) * 4, "=");
+    const json = Buffer.from(payloadSegment, "base64").toString("utf8");
+    const payload = JSON.parse(json);
+    return payload && typeof payload === "object" ? payload : null;
+  } catch (error) {
+    return null;
+  }
+}
+
+function extractGoogleIdentityFromTokens(tokens) {
+  const payload = parseJwtPayload(tokens?.id_token);
+  if (!payload) {
+    return null;
+  }
+
+  const providerUserId = String(payload.sub || "").trim();
+  if (!providerUserId) {
+    return null;
+  }
+
+  return {
+    provider: "google",
+    providerUserId,
+    email: String(payload.email || "").trim() || null,
+    displayName: String(payload.name || "").trim() || null
+  };
 }
 
 async function exchangeCodeForTokens(code) {
@@ -198,6 +246,7 @@ module.exports = {
   isGoogleConnected,
   getGoogleAuthUrl,
   exchangeCodeForTokens,
+  extractGoogleIdentityFromTokens,
   setGoogleTokensOnSession,
   clearGoogleSession,
   createGoogleEventFromSession,

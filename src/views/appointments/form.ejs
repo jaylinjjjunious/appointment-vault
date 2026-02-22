@@ -64,6 +64,37 @@
       </div>
 
       <div class="form-field">
+        <label class="checkbox-field" for="isRecurring">
+          <input
+            id="isRecurring"
+            name="isRecurring"
+            type="checkbox"
+            value="true"
+            <%= appointment.isRecurring ? "checked" : "" %>
+          />
+          <span>Recurring appointment</span>
+        </label>
+      </div>
+
+      <div class="form-field">
+        <label for="rrule">RRULE</label>
+        <input
+          id="rrule"
+          class="glass-input"
+          name="rrule"
+          type="text"
+          value="<%= appointment.rrule || '' %>"
+          placeholder="FREQ=WEEKLY;INTERVAL=1;BYDAY=MO,WE,FR"
+        />
+        <p class="section-empty">
+          Example: <code>FREQ=WEEKLY;INTERVAL=1;BYDAY=MO,WE,FR</code>
+        </p>
+        <% if (errors.rrule) { %>
+          <p class="field-error"><%= errors.rrule %></p>
+        <% } %>
+      </div>
+
+      <div class="form-field">
         <label for="notes">Notes</label>
         <textarea id="notes" class="glass-input" name="notes" rows="5"><%= appointment.notes %></textarea>
       </div>
