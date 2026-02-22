@@ -41,9 +41,10 @@ body {
   margin: 0;
   color: var(--text);
   background:
+    linear-gradient(180deg, rgba(238, 242, 248, 0.72) 0%, rgba(227, 233, 243, 0.8) 100%),
     radial-gradient(920px 560px at -10% -18%, var(--bg-accent-a), transparent 72%),
     radial-gradient(720px 560px at 112% -24%, var(--bg-accent-b), transparent 70%),
-    linear-gradient(180deg, #eef2f8 0%, #e3e9f3 100%),
+    url("/public/app-background.png") center center / cover no-repeat fixed,
     var(--bg);
   font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Segoe UI", Roboto, Arial, sans-serif;
   font-size: 15px;
