@@ -9,14 +9,17 @@
   --text: #0f1726;
   --muted: #445066;
 
+  --primary-solid: #0a6ff5;
   --primary: linear-gradient(180deg, #2584ff 0%, #0b63f3 100%);
   --primary-hover: linear-gradient(180deg, #1e78ef 0%, #0857dd 100%);
+  --secondary-solid: #374154;
   --secondary: linear-gradient(180deg, #4b5569 0%, #374154 100%);
   --secondary-hover: linear-gradient(180deg, #404a5f 0%, #2f3848 100%);
+  --danger-solid: #d93f43;
   --danger: linear-gradient(180deg, #f25f63 0%, #d93f43 100%);
   --danger-hover: linear-gradient(180deg, #e44f53 0%, #c73438 100%);
 
-  --focus: #2f7dff;
+  --focus: var(--primary-solid);
 
   --shadow-sm: 0 8px 22px rgba(15, 23, 38, 0.08);
   --shadow-md: 0 18px 40px rgba(15, 23, 38, 0.12);
@@ -206,7 +209,7 @@ body {
 }
 
 .today-section {
-  border-left: 4px solid #2180ff;
+  border-left: 4px solid var(--primary-solid);
   background: linear-gradient(145deg, rgba(255, 255, 255, 0.78) 0%, rgba(233, 243, 255, 0.52) 100%);
 }
 
@@ -505,7 +508,7 @@ body {
 
 .error-text,
 .field-error {
-  color: var(--danger);
+  color: var(--danger-solid);
 }
 
 .modal-open {
