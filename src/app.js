@@ -2,6 +2,7 @@ const express = require("express");
 const session = require("express-session");
 const path = require("node:path");
 const { randomUUID } = require("node:crypto");
+const { version: APP_VERSION = "0.0.0" } = require("../package.json");
 const db = require("./db");
 const { parseAppointment, AiParseError } = require("./ai");
 const {
@@ -61,6 +62,23 @@ function resolveAppTimezone() {
 }
 
 const APP_TIMEZONE = resolveAppTimezone();
+const BUILD_STARTED_AT = new Date().toISOString();
+const BUILD_COMMIT =
+  String(
+    process.env.RENDER_GIT_COMMIT ||
+      process.env.COMMIT_SHA ||
+      process.env.GIT_COMMIT ||
+      "unknown"
+  ).trim() || "unknown";
+const BUILD_BRANCH =
+  String(
+    process.env.RENDER_GIT_BRANCH ||
+      process.env.BRANCH ||
+      process.env.GIT_BRANCH ||
+      "unknown"
+  ).trim() || "unknown";
+const BUILD_INSTANCE =
+  String(process.env.RENDER_INSTANCE_ID || process.env.HOSTNAME || "unknown").trim() || "unknown";
 const GOOGLE_TOKENS_SETTING_KEY = "google.tokens";
 const GOOGLE_PROFILE_SETTING_KEY = "google.profile";
 const LEGACY_APPOINTMENT_ASSIGNMENT_KEY = "legacy.appointments.assigned";
@@ -1101,6 +1119,18 @@ app.post("/auth/google/disconnect", (req, res) => {
 
 app.get("/health", (req, res) => {
   res.status(200).send("OK");
+});
+
+app.get("/version", (req, res) => {
+  res.status(200).json({
+    app: "appointment-vault",
+    version: APP_VERSION,
+    commit: BUILD_COMMIT,
+    branch: BUILD_BRANCH,
+    instance: BUILD_INSTANCE,
+    startedAt: BUILD_STARTED_AT,
+    now: new Date().toISOString()
+  });
 });
 
 app.post("/twilio/voice", (req, res) => {
