@@ -118,7 +118,20 @@
       document.body.classList.toggle("modal-open", isOpen);
     };
 
+    const armOpenButton = () => {
+      openButton.disabled = true;
+      setTimeout(() => {
+        openButton.disabled = false;
+      }, 450);
+    };
+
     openButton.addEventListener("click", (event) => {
+      if (openButton.disabled) {
+        event.preventDefault();
+        event.stopPropagation();
+        return;
+      }
+
       event.preventDefault();
       event.stopPropagation();
       setOpen(true);
@@ -144,9 +157,11 @@
 
     window.addEventListener("pageshow", () => {
       setOpen(false);
+      armOpenButton();
     });
 
     setOpen(false);
+    armOpenButton();
   })();
 </script>
 
