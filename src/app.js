@@ -1367,6 +1367,16 @@ function renderSettingsHistoryPage(req, res, next) {
 app.get("/setting", (req, res) => {
   res.redirect("/settings");
 });
+app.get("/checkin", (req, res) => {
+  const user = requireCurrentUser(req, res);
+  if (!user) {
+    return;
+  }
+
+  res.render("checkin", {
+    title: "Check-In Portal"
+  });
+});
 app.get("/settings/history", renderSettingsHistoryPage);
 app.get(/^\/settings.*$/i, renderSettingsPage);
 

@@ -1,0 +1,35 @@
+<%- include("partials/top", { title }) %>
+
+<section class="page-heading">
+  <h1>Check-In Portal</h1>
+  <p>Use the live CE Check-In portal inside the panel below.</p>
+</section>
+
+<section class="calendar-section glass-panel checkin-panel">
+  <div class="actions">
+    <a
+      class="button glass-button button-secondary"
+      href="https://cecheckin.com"
+      target="_blank"
+      rel="noopener noreferrer"
+    >
+      Open In New Tab
+    </a>
+  </div>
+  <div class="checkin-embed-wrap">
+    <iframe
+      class="checkin-embed"
+      src="https://cecheckin.com"
+      title="CE Check-In Website"
+      loading="eager"
+      referrerpolicy="no-referrer-when-downgrade"
+    ></iframe>
+  </div>
+  <p class="section-empty">
+    If CE Check-In blocks embedding in your browser, use the
+    <a href="https://cecheckin.com" target="_blank" rel="noopener noreferrer">Open In New Tab</a>
+    button.
+  </p>
+</section>
+
+<%- include("partials/bottom") %>
