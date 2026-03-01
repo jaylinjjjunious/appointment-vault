@@ -337,6 +337,31 @@ npm run google:refresh-token
 - “Schedule a checkup tomorrow at 10am”
 - “Book a meeting next Tuesday at 2:30pm, notes: bring documents”
 
+## ChatGPT Action Setup
+
+Use a ChatGPT Action to create appointments directly from ChatGPT.
+
+1. Deploy the app and note your public base URL (must be HTTPS).
+2. Set these env vars in production:
+   - `ACTION_API_TOKEN`
+   - `DEFAULT_TIMEZONE`
+   - `GOOGLE_CLIENT_ID`
+   - `GOOGLE_CLIENT_SECRET`
+   - `GOOGLE_REDIRECT_URI`
+   - `GOOGLE_REFRESH_TOKEN`
+   - `GOOGLE_CALENDAR_ID`
+3. In ChatGPT → Create a GPT → Actions:
+   - Paste `openapi.chatgpt-action.yaml`
+   - Set the server URL to your deployed base (replace `https://YOUR_DOMAIN`)
+   - Configure auth as **API Key / Bearer Token** and paste the same `ACTION_API_TOKEN`
+4. Test with:
+   - “I have an appointment for March 4 at 3pm”
+
+Expected behavior:
+- Valid token creates a DB row and Google Calendar event.
+- Invalid token returns 401.
+- Missing required fields returns 400.
+
 ## Quick Add Verification Checklist
 
 - Start server: `npm run dev`

@@ -374,7 +374,15 @@ app.use((req, res, next) => {
   }
 });
 app.use((req, res, next) => {
-  const publicPrefixes = ["/public", "/health", "/version", "/twilio", "/auth", "/api/docs"];
+  const publicPrefixes = [
+    "/public",
+    "/health",
+    "/version",
+    "/twilio",
+    "/auth",
+    "/api/docs",
+    "/api/actions"
+  ];
   const isApiPath = req.path.startsWith("/api/");
   const isPublic = publicPrefixes.some(
     (prefix) => req.path === prefix || req.path.startsWith(`${prefix}/`)
@@ -659,6 +667,14 @@ function addMinutesToIso(startIso, minutes) {
   }
   const next = new Date(start.getTime() + minutes * 60 * 1000);
   return next.toISOString();
+}
+
+function isValidIsoDateTime(value) {
+  if (!value) {
+    return false;
+  }
+  const parsed = new Date(value);
+  return !Number.isNaN(parsed.getTime());
 }
 
 function formatDateTimeForTimezone(date, timeZone) {
@@ -2551,6 +2567,148 @@ app.post("/api/assistant/calendar", async (req, res, next) => {
       }
     });
   } catch (error) {
+    if (error instanceof GoogleCalendarError) {
+      res.status(500).json({ ok: false, message: error.message });
+      return;
+    }
+    next(error);
+  }
+});
+
+app.post("/api/actions/appointments", async (req, res, next) => {
+  try {
+    const token = String(process.env.ACTION_API_TOKEN || "").trim();
+    const authHeader = String(req.headers.authorization || "").trim();
+    const expected = token ? `Bearer ${token}` : "";
+
+    if (!token || authHeader !== expected) {
+      res.status(401).json({ ok: false, message: "Unauthorized." });
+      return;
+    }
+
+    const payload = req.body || {};
+    const title = String(payload.title || "").trim();
+    const startIso = String(payload.start || "").trim();
+    const endIso = String(payload.end || "").trim() || addMinutesToIso(startIso, 30);
+    const timezone =
+      String(payload.timezone || "").trim() ||
+      String(process.env.DEFAULT_TIMEZONE || "").trim() ||
+      APP_TIMEZONE;
+    const notes = String(payload.notes || "").trim();
+
+    const errors = {};
+    if (!title) errors.title = "Title is required.";
+    if (!startIso || !isValidIsoDateTime(startIso)) errors.start = "Start must be ISO 8601.";
+    if (!endIso || !isValidIsoDateTime(endIso)) errors.end = "End must be ISO 8601.";
+    if (!timezone) errors.timezone = "Timezone is required.";
+
+    if (Object.keys(errors).length > 0) {
+      res.status(400).json({ ok: false, message: "Invalid input.", errors });
+      return;
+    }
+
+    let actionUser = req.currentUser || null;
+    if (!actionUser) {
+      const existing = selectAnyUserStatement.get();
+      if (existing?.id) {
+        actionUser = selectUserByIdStatement.get(existing.id) || null;
+      }
+    }
+    if (!actionUser) {
+      actionUser = upsertUserFromIdentity({
+        provider: "local",
+        providerUserId: "local-default",
+        email: null,
+        displayName: "Local Profile"
+      });
+    }
+    if (!actionUser) {
+      res.status(500).json({ ok: false, message: "Unable to resolve user context." });
+      return;
+    }
+
+    const startDate = new Date(startIso);
+    const { date, time } = formatDateTimeForTimezone(startDate, timezone);
+    const appointmentInput = normalizeInput({
+      title,
+      date,
+      time,
+      location: "",
+      notes,
+      tags: "",
+      reminderMinutes: "",
+      isRecurring: "",
+      rrule: ""
+    });
+
+    const appointmentErrors = validateAppointment(appointmentInput);
+    if (Object.keys(appointmentErrors).length > 0) {
+      res.status(400).json({
+        ok: false,
+        message: "Appointment data failed validation.",
+        errors: appointmentErrors
+      });
+      return;
+    }
+
+    const now = new Date().toISOString();
+    const record = serializeForDb(appointmentInput);
+    const insertInfo = db.prepare(
+      `INSERT INTO appointments
+        (userId, title, date, time, location, notes, tags, reminderMinutes, isRecurring, rrule, seriesId, occurrenceStart, occurrenceEnd, createdAt, updatedAt)
+       VALUES
+        (@userId, @title, @date, @time, @location, @notes, @tags, @reminderMinutes, @isRecurring, @rrule, @seriesId, @occurrenceStart, @occurrenceEnd, @createdAt, @updatedAt)`
+    ).run({
+      ...record,
+      userId: actionUser.id,
+      occurrenceStart: `${record.date}T${record.time}:00`,
+      occurrenceEnd: null,
+      createdAt: now,
+      updatedAt: now
+    });
+
+    let calendarResult = null;
+    try {
+      calendarResult = await createCalendarEvent({
+        title: record.title,
+        start: startIso,
+        end: endIso,
+        timezone,
+        notes
+      });
+    } catch (error) {
+      db.prepare("DELETE FROM appointments WHERE id = ? AND userId = ?").run(
+        Number(insertInfo.lastInsertRowid),
+        actionUser.id
+      );
+      throw error;
+    }
+
+    if (calendarResult?.eventId) {
+      db.prepare(
+        `UPDATE appointments
+         SET googleEventId = ?, updatedAt = ?
+         WHERE id = ? AND userId = ?`
+      ).run(
+        calendarResult.eventId,
+        new Date().toISOString(),
+        Number(insertInfo.lastInsertRowid),
+        actionUser.id
+      );
+    }
+
+    res.json({
+      appointment_id: Number(insertInfo.lastInsertRowid),
+      calendar_event_id: calendarResult?.eventId || null,
+      calendar_link: calendarResult?.htmlLink || null,
+      title,
+      start: startIso,
+      end: endIso,
+      timezone,
+      notes: notes || null
+    });
+  } catch (error) {
+    console.error("Action appointment error:", error);
     if (error instanceof GoogleCalendarError) {
       res.status(500).json({ ok: false, message: error.message });
       return;
