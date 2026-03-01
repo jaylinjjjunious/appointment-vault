@@ -23,6 +23,74 @@ function getGoogleConfig() {
   };
 }
 
+function getCalendarEnvConfig() {
+  return {
+    ...getGoogleConfig(),
+    refreshToken: String(process.env.GOOGLE_REFRESH_TOKEN || "").trim(),
+    calendarId: String(process.env.GOOGLE_CALENDAR_ID || "primary").trim() || "primary"
+  };
+}
+
+function getCalendarClientFromEnv() {
+  const { clientId, clientSecret, redirectUri, refreshToken } = getCalendarEnvConfig();
+
+  if (!clientId || !clientSecret || !redirectUri || !refreshToken) {
+    throw new GoogleCalendarError(
+      "Missing required Google Calendar env vars: GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_REDIRECT_URI, GOOGLE_REFRESH_TOKEN."
+    );
+  }
+
+  const oauth2Client = new google.auth.OAuth2(clientId, clientSecret, redirectUri);
+  oauth2Client.setCredentials({ refresh_token: refreshToken });
+  return google.calendar({ version: "v3", auth: oauth2Client });
+}
+
+async function createCalendarEvent({ title, start, end, timezone, notes }) {
+  const safeTitle = String(title || "").trim();
+  const safeStart = String(start || "").trim();
+  const safeEnd = String(end || "").trim();
+  const safeTimezone = String(timezone || "").trim();
+
+  if (!safeTitle || !safeStart || !safeEnd || !safeTimezone) {
+    throw new GoogleCalendarError("createCalendarEvent requires title, start, end, and timezone.");
+  }
+
+  const calendar = getCalendarClientFromEnv();
+  const { calendarId } = getCalendarEnvConfig();
+  const event = {
+    summary: safeTitle,
+    start: {
+      dateTime: safeStart,
+      timeZone: safeTimezone
+    },
+    end: {
+      dateTime: safeEnd,
+      timeZone: safeTimezone
+    }
+  };
+
+  const description = String(notes || "").trim();
+  if (description) {
+    event.description = description;
+  }
+
+  try {
+    const response = await calendar.events.insert({
+      calendarId,
+      requestBody: event
+    });
+
+    return {
+      eventId: response?.data?.id || null,
+      htmlLink: response?.data?.htmlLink || null
+    };
+  } catch (error) {
+    throw new GoogleCalendarError(
+      `Failed creating Google Calendar event: ${error?.message || "unknown error"}`
+    );
+  }
+}
+
 function hasGoogleConfig() {
   const { clientId, clientSecret, redirectUri } = getGoogleConfig();
   return Boolean(clientId && clientSecret && redirectUri);
@@ -736,6 +804,7 @@ module.exports = {
   extractGoogleIdentityFromTokens,
   setGoogleTokensOnSession,
   clearGoogleSession,
+  createCalendarEvent,
   createGoogleEventFromSession,
   createTodoEventFromSession,
   listTodoEventsFromSession,

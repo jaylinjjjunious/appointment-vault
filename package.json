@@ -61,6 +61,7 @@
     "multer": "^1.4.5-lts.1",
     "node-cron": "^4.2.1",
     "nodemailer": "^6.9.15",
+    "openai": "^4.0.0",
     "pino": "^9.5.0",
     "pino-http": "^10.3.0",
     "swagger-ui-express": "^5.0.1",

@@ -26,6 +26,34 @@
 <section class="dashboard-grid grid grid-cols-1 lg:grid-cols-2 gap-6">
   <div class="dashboard-main-col space-y-6">
     <section class="card glass-panel">
+      <h2 class="text-xl font-semibold">Instant Calendar Log</h2>
+      <p class="text-base-content/70 mt-2">
+        Type a sentence and we will book it immediately.
+      </p>
+      <form id="calendarAssistantForm" class="form-grid space-y-4 mt-4">
+        <div class="form-field">
+          <label class="text-sm text-base-content/70" for="calendarAssistantInput">Appointment request</label>
+          <textarea
+            id="calendarAssistantInput"
+            rows="5"
+            class="agent-textarea glass-input"
+            placeholder="I have an appointment for 3pm on March 4th"
+            required
+          ></textarea>
+        </div>
+        <div class="actions flex flex-wrap gap-3">
+          <button class="glass-button" type="submit">Book it</button>
+        </div>
+      </form>
+      <div id="calendarAssistantReply" class="mt-4" hidden>
+        <p class="text-sm text-base-content/80" data-reply></p>
+        <a class="glass-button button-secondary mt-3" data-calendar-link href="#" target="_blank" rel="noopener noreferrer" hidden>
+          Open in Google Calendar
+        </a>
+      </div>
+    </section>
+
+    <section class="card glass-panel">
       <form class="form-grid space-y-4" action="/agent/parse" method="POST">
         <div class="form-field">
           <label class="text-sm text-base-content/70" for="promptText">Tell me your appointment</label>
@@ -180,5 +208,67 @@
     </form>
   </section>
 <% } %>
+
+<script>
+  (() => {
+    const form = document.getElementById("calendarAssistantForm");
+    const input = document.getElementById("calendarAssistantInput");
+    const replyWrap = document.getElementById("calendarAssistantReply");
+    const replyText = replyWrap?.querySelector("[data-reply]");
+    const calendarLink = replyWrap?.querySelector("[data-calendar-link]");
+
+    if (!form || !input || !replyWrap || !replyText || !calendarLink) {
+      return;
+    }
+
+    let pendingContext = null;
+
+    const renderReply = (text, link) => {
+      replyText.textContent = text || "";
+      replyWrap.hidden = false;
+      if (link) {
+        calendarLink.href = link;
+        calendarLink.hidden = false;
+      } else {
+        calendarLink.hidden = true;
+      }
+    };
+
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const raw = String(input.value || "").trim();
+      if (!raw) {
+        return;
+      }
+
+      const message = pendingContext
+        ? `${pendingContext.original}\nClarification answer: ${raw}`
+        : raw;
+
+      replyWrap.hidden = true;
+      try {
+        const response = await fetch("/api/assistant/calendar", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ message })
+        });
+        const data = await response.json();
+        if (!response.ok) {
+          renderReply(data?.message || "Something went wrong. Please try again.");
+          return;
+        }
+
+        renderReply(data?.reply || "Done.", data?.calendar?.htmlLink || "");
+        if (data?.needs_clarification) {
+          pendingContext = { original: pendingContext?.original || raw };
+        } else {
+          pendingContext = null;
+        }
+      } catch (error) {
+        renderReply("Unable to reach the server. Please try again.");
+      }
+    });
+  })();
+</script>
 
 <%- include("partials/bottom") %>

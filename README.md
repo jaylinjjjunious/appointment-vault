@@ -290,6 +290,38 @@ http://localhost:3000/agent
 
 6. Enter a natural language instruction, click **Create appointment**, review the parsed preview, then click **Save it**.
 
+## OpenAI Calendar Logging
+
+Use the `/agent` page to instantly log appointments and create Google Calendar events from natural language.
+
+### Environment Variables
+
+```
+OPENAI_API_KEY=...
+OPENAI_MODEL=gpt-4.1-mini
+DEFAULT_TIMEZONE=America/Los_Angeles
+GOOGLE_CLIENT_ID=...
+GOOGLE_CLIENT_SECRET=...
+GOOGLE_REDIRECT_URI=https://your-domain/auth/google/callback
+GOOGLE_REFRESH_TOKEN=...
+GOOGLE_CALENDAR_ID=primary
+```
+
+### Getting a Google Refresh Token (quick method)
+
+1. Go to the Google OAuth Playground: https://developers.google.com/oauthplayground
+2. Click the gear icon, check **Use your own OAuth credentials**, and paste your client ID/secret.
+3. In Step 1, select **Google Calendar API v3** scope:
+   - `https://www.googleapis.com/auth/calendar`
+4. Click **Authorize APIs**, sign in, then in Step 2 click **Exchange authorization code for tokens**.
+5. Copy the **refresh_token** and put it in `GOOGLE_REFRESH_TOKEN`.
+
+### Example prompts
+
+- “I have an appointment for 3pm on March 4th”
+- “Schedule a checkup tomorrow at 10am”
+- “Book a meeting next Tuesday at 2:30pm, notes: bring documents”
+
 ## Quick Add Verification Checklist
 
 - Start server: `npm run dev`
