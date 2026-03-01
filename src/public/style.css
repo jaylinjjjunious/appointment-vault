@@ -496,7 +496,7 @@ body::after {
 
 .section-divider {
   height: 1px;
-  width: 1100px;
+  width: 100%;
   position: relative;
   left: 0;
   background: rgba(15, 23, 42, 0.28);
@@ -2379,6 +2379,9 @@ summary:focus-visible {
 }
 
 @media (max-width: 780px) {
+  body {
+    overflow-x: hidden;
+  }
     .app-shell {
         grid-template-columns: 1fr;
         padding: 1rem;
@@ -2421,6 +2424,7 @@ summary:focus-visible {
 
   .app-main {
     max-width: none;
+    width: 100%;
   }
 
   .app-content {
@@ -2450,6 +2454,7 @@ summary:focus-visible {
 
   .dashboard-intro {
     grid-template-columns: 1fr;
+    width: 100%;
   }
 
   .dashboard-stats {
@@ -2458,6 +2463,7 @@ summary:focus-visible {
 
   .dashboard-grid {
     grid-template-columns: 1fr;
+    width: 100%;
   }
 
   .form-row {
