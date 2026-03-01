@@ -2577,12 +2577,16 @@ app.post("/api/assistant/calendar", async (req, res, next) => {
 
 app.post("/api/actions/appointments", async (req, res, next) => {
   try {
-    const token = String(process.env.ACTION_API_TOKEN || "").trim();
+    const expectedToken = String(process.env.ACTION_API_TOKEN || "").trim();
     const authHeader = String(req.headers.authorization || "").trim();
-    const expected = token ? `Bearer ${token}` : "";
+    console.log("EXPECTED TOKEN:", process.env.ACTION_API_TOKEN);
+    console.log("RECEIVED HEADER:", req.headers.authorization);
+    const receivedToken = authHeader.toLowerCase().startsWith("bearer ")
+      ? authHeader.slice(7).trim()
+      : "";
 
-    if (!token || authHeader !== expected) {
-      res.status(401).json({ ok: false, message: "Unauthorized." });
+    if (!expectedToken || !receivedToken || receivedToken !== expectedToken) {
+      res.status(401).json({ error: "Unauthorized" });
       return;
     }
 
