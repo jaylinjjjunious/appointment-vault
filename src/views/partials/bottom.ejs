@@ -1,6 +1,16 @@
         </main>
       </div>
       <div class="drawer-side">
+        <%
+          const safeCurrentUser =
+            typeof currentUser !== "undefined" && currentUser ? currentUser : null;
+          const safeAuthRequired =
+            typeof authRequired !== "undefined" ? Boolean(authRequired) : true;
+          const userSeed =
+            safeCurrentUser &&
+            (safeCurrentUser.displayName || safeCurrentUser.email || "U");
+          const userInitial = userSeed ? userSeed.trim().charAt(0).toUpperCase() : "U";
+        %>
         <label for="sidebar-toggle" class="drawer-overlay" aria-label="Close sidebar"></label>
         <aside class="app-sidebar">
           <div class="sidebar-brand">
