@@ -1,0 +1,130 @@
+<%- include("partials/top", { title }) %>
+
+<%
+  const safeCheckinDocs =
+    typeof checkinDocuments !== "undefined" && Array.isArray(checkinDocuments)
+      ? checkinDocuments
+      : [];
+  const safeDocStatus = typeof checkinDocStatus === "string" ? checkinDocStatus : "";
+  const canUploadDocs = typeof checkinUploadAvailable !== "undefined" ? Boolean(checkinUploadAvailable) : true;
+%>
+
+<section class="page-heading">
+  <h1>Calendar</h1>
+  <p>Your Google Calendar opens directly inside this panel.</p>
+</section>
+
+<div class="calendar-layout">
+  <section class="calendar-section glass-panel">
+  <% if (!googleConnected) { %>
+    <p class="section-empty">Google Calendar is not connected yet.</p>
+    <div class="actions">
+      <a class="button glass-button" href="/auth/google" data-activity="google_connect" data-activity-title="Connected Google Calendar">Connect Google Calendar</a>
+    </div>
+  <% } else { %>
+      <div class="actions">
+        <a
+          class="button glass-button button-secondary"
+          href="<%= calendarEmbedUrl %>"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          Open In New Tab
+        </a>
+      </div>
+      <div class="checkin-embed-wrap">
+        <iframe
+          class="checkin-embed"
+          src="<%= calendarEmbedUrl %>"
+          title="Google Calendar Panel"
+          loading="eager"
+          referrerpolicy="no-referrer-when-downgrade"
+        ></iframe>
+      </div>
+    <% } %>
+  </section>
+
+  <section id="checkin" class="calendar-section glass-panel checkin-panel">
+    <h2>Check-In Portal</h2>
+    <p class="section-empty">Use the live CE Check-In portal inside the panel below.</p>
+    <div class="actions">
+      <a
+        class="button glass-button button-secondary"
+        href="https://www.cecheckin.com/client/account/signin"
+        target="_blank"
+        rel="noopener noreferrer"
+      >
+        Open In New Tab
+      </a>
+    </div>
+    <div class="checkin-embed-wrap">
+      <iframe
+        class="checkin-embed"
+        src="https://www.cecheckin.com/client/account/signin"
+        title="CE Check-In Website"
+        loading="eager"
+        referrerpolicy="no-referrer-when-downgrade"
+      ></iframe>
+    </div>
+    <p class="section-empty">
+      If CE Check-In blocks embedding in your browser, use the
+      <a href="https://www.cecheckin.com/client/account/signin" target="_blank" rel="noopener noreferrer">Open In New Tab</a>
+      button.
+    </p>
+  </section>
+
+  <section id="checkin-docs" class="calendar-section glass-panel">
+    <h2>Check-In Documents (Probation)</h2>
+    <p class="section-empty">Upload photos and documents so they are saved in your Appointment Vault database.</p>
+
+    <% if (!canUploadDocs) { %>
+      <p class="error-text">Document uploads are unavailable until dependencies are installed.</p>
+    <% } else if (safeDocStatus === "uploaded") { %>
+      <p class="section-empty">Document saved.</p>
+    <% } else if (safeDocStatus === "missing") { %>
+      <p class="error-text">Please choose a file to upload.</p>
+    <% } else if (safeDocStatus === "unsupported") { %>
+      <p class="error-text">Unsupported file type. Use JPG, PNG, WEBP, or PDF/DOC/DOCX.</p>
+    <% } else if (safeDocStatus === "too_large") { %>
+      <p class="error-text">File is too large. Max size is 8 MB.</p>
+    <% } else if (safeDocStatus === "unavailable") { %>
+      <p class="error-text">Uploads are unavailable. Install dependencies and restart the server.</p>
+    <% } else if (safeDocStatus === "error") { %>
+      <p class="error-text">Unable to save the document right now.</p>
+    <% } else if (safeDocStatus === "deleted") { %>
+      <p class="section-empty">Document deleted.</p>
+    <% } %>
+
+    <form class="form-grid" action="/calendar/checkin-documents" method="POST" enctype="multipart/form-data">
+      <div class="form-field">
+        <label for="docTitle">Title (optional)</label>
+        <input id="docTitle" class="glass-input" name="docTitle" type="text" placeholder="Monthly proof, ID update, receipts" <%= canUploadDocs ? '' : 'disabled' %> />
+      </div>
+      <div class="form-field">
+        <label for="docDescription">Description (optional)</label>
+        <textarea id="docDescription" class="glass-input" name="docDescription" rows="3" placeholder="Add context for this document" <%= canUploadDocs ? '' : 'disabled' %>></textarea>
+      </div>
+      <div class="form-field">
+        <label for="documentFile">Upload file (JPG, PNG, WEBP, PDF, DOC, DOCX)</label>
+        <input id="documentFile" class="glass-input" name="documentFile" type="file" accept=".jpg,.jpeg,.png,.webp,.pdf,.doc,.docx" <%= canUploadDocs ? 'required' : 'disabled' %> />
+        <p class="section-empty">Max 8 MB per file.</p>
+      </div>
+      <div class="actions">
+        <button class="button glass-button" type="submit" <%= canUploadDocs ? '' : 'disabled' %>>Save Document</button>
+      </div>
+    </form>
+
+    <div class="todo-list">
+      <h3>Saved Documents</h3>
+      <%- include("ui/DataList", {
+        items: safeCheckinDocs,
+        itemPartial: "dashboard/CheckinDocumentItem",
+        emptyTitle: "No documents saved yet",
+        emptyMessage: "Upload a file to keep it saved in Appointment Vault.",
+        emptyActions: ""
+      }) %>
+    </div>
+  </section>
+</div>
+
+<%- include("partials/bottom") %>

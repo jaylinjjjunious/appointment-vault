@@ -7,39 +7,105 @@
     typeof testProfileActive !== "undefined" ? testProfileActive : false;
   const activeTestProfile =
     typeof testProfile !== "undefined" && testProfile ? testProfile : null;
+  const safeCurrentUser =
+    typeof currentUser !== "undefined" && currentUser ? currentUser : null;
+  const safeAuthRequired =
+    typeof authRequired !== "undefined" ? Boolean(authRequired) : true;
+  const userSeed =
+    safeCurrentUser &&
+    (safeCurrentUser.displayName || safeCurrentUser.email || "U");
+  const userInitial = userSeed ? userSeed.trim().charAt(0).toUpperCase() : "U";
 %>
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="vaultDark">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title><%= title %> | Appointment Vault</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap"
+      rel="stylesheet"
+    />
     <link rel="stylesheet" href="/public/style.css" />
+    <link rel="stylesheet" href="/public/app.css" />
+    <script src="https://unpkg.com/htmx.org@2.0.4" defer></script>
+    <script src="/public/ui.js" defer></script>
+    <script src="/public/ui-activity.js" defer></script>
+    <script src="/public/ui-error-boundary.js" defer></script>
   </head>
   <body>
-    <header class="site-header glass-nav">
-      <div class="container header-inner">
-        <a href="/" class="brand">Appointment Vault</a>
-        <nav class="nav-links">
-          <a class="button glass-button button-secondary" href="/">Home</a>
-          <a class="button glass-button button-secondary" href="/appointments/new">Add Appointment</a>
-          <a class="button glass-button button-secondary" href="/agent">AI Quick Add</a>
-          <a class="button glass-button button-secondary" href="/checkin">Check-In</a>
-          <a class="button glass-button button-secondary" href="/settings">Settings</a>
-          <% if (isTestProfileActive && activeTestProfile) { %>
-            <span class="test-profile-badge">
-              Test: <%= activeTestProfile.name %>
-            </span>
-          <% } else if (isGoogleConfigured) { %>
-            <% if (isGoogleConnected) { %>
-              <form class="inline-nav-form" action="/auth/google/disconnect" method="POST">
-                <button class="button glass-button button-secondary" type="submit">Disconnect Google</button>
-              </form>
-            <% } else { %>
-              <a class="button glass-button button-secondary" href="/auth/google">Connect Google Calendar</a>
-            <% } %>
-          <% } %>
+    <div class="app-shell">
+      <aside class="app-sidebar">
+        <div class="sidebar-brand">
+          <span class="sidebar-logo">S</span>
+          <span class="sidebar-title">Appointment Vault</span>
+        </div>
+        <nav class="menu sidebar-nav" aria-label="Primary">
+          <a class="nav-pill" data-nav-key="dashboard" href="/dashboard">
+            <span class="nav-icon">DB</span>
+            <span>Dashboard</span>
+          </a>
+          <a class="nav-pill" data-nav-key="new" href="/appointments">
+            <span class="nav-icon">APT</span>
+            <span>Appointments</span>
+          </a>
+          <a class="nav-pill" data-nav-key="calendar" href="/calendar">
+            <span class="nav-icon">CAL</span>
+            <span>Calendar</span>
+          </a>
+          <a class="nav-pill" data-nav-key="settings" href="/settings">
+            <span class="nav-icon">SET</span>
+            <span>Settings</span>
+          </a>
         </nav>
-      </div>
-    </header>
-    <main class="container">
+
+        <% if (safeAuthRequired && safeCurrentUser) { %>
+          <div class="sidebar-profile">
+            <div class="sidebar-avatar" aria-hidden="true"><%= userInitial %></div>
+            <div class="sidebar-profile-meta">
+              <span class="sidebar-profile-name"><%= safeCurrentUser.displayName || safeCurrentUser.email || "User" %></span>
+              <% if (safeCurrentUser.email) { %>
+                <span class="sidebar-profile-email"><%= safeCurrentUser.email %></span>
+              <% } %>
+            </div>
+          </div>
+          <form class="sidebar-logout" action="/auth/logout" method="POST">
+            <button class="button glass-button button-secondary w-full" type="submit">Sign Out</button>
+          </form>
+        <% } %>
+      </aside>
+
+      <div class="app-main">
+        <header class="app-topbar">
+          <div class="topbar-left">
+            <form class="topbar-search" action="/appointments" method="GET">
+              <label class="input input-bordered topbar-search-input">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 opacity-70" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M11 19a8 8 0 100-16 8 8 0 000 16z" />
+                </svg>
+                <input type="text" name="title" placeholder="Search appointments" />
+              </label>
+            </form>
+          </div>
+          <div class="topbar-right">
+            <a class="button glass-button button-primary-blue" href="/appointments#quick-add">Create draft</a>
+            <button type="button" class="icon-button" aria-label="Notifications">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.4-1.4A2 2 0 0118 14.17V11a6 6 0 10-12 0v3.17a2 2 0 01-.6 1.43L4 17h5m6 0a3 3 0 11-6 0h6z" />
+              </svg>
+            </button>
+            <button type="button" class="icon-button" aria-label="Quick actions">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v12m6-6H6" />
+              </svg>
+            </button>
+            <button type="button" class="icon-button" data-theme-toggle aria-pressed="false" aria-label="Toggle dark mode">🌙</button>
+            <% if (safeCurrentUser) { %>
+              <div class="avatar-pill"><%= userInitial %></div>
+            <% } %>
+          </div>
+        </header>
+
+        <main class="app-content">

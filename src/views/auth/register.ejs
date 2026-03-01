@@ -1,0 +1,33 @@
+<%- include("../partials/top", { title }) %>
+
+<section class="page-heading">
+  <h1>Create Account</h1>
+  <p>Set up a local account for Appointment Vault.</p>
+</section>
+
+<section class="card glass-panel auth-card">
+  <% if (error) { %>
+    <p class="error-text"><%= error %></p>
+  <% } %>
+  <form class="form-grid" action="/auth/register" method="POST">
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>" />
+    <div class="form-field">
+      <label for="displayName">Display Name</label>
+      <input id="displayName" class="glass-input" name="displayName" type="text" value="<%= values.displayName || '' %>" />
+    </div>
+    <div class="form-field">
+      <label for="email">Email</label>
+      <input id="email" class="glass-input" name="email" type="email" value="<%= values.email || '' %>" required />
+    </div>
+    <div class="form-field">
+      <label for="password">Password</label>
+      <input id="password" class="glass-input" name="password" type="password" minlength="8" required />
+    </div>
+    <div class="actions">
+      <button class="button glass-button" type="submit">Create Account</button>
+      <a class="button glass-button button-secondary" href="/auth/login">Back to Sign In</a>
+    </div>
+  </form>
+</section>
+
+<%- include("../partials/bottom") %>

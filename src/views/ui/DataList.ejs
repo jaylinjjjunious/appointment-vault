@@ -1,0 +1,11 @@
+<div class="data-list <%= typeof className !== 'undefined' ? className : '' %>">
+  <% if (!items || items.length === 0) { %>
+    <%- include("EmptyState", { title: emptyTitle, message: emptyMessage, actions: emptyActions }) %>
+  <% } else { %>
+    <ul class="list">
+      <% items.forEach((item) => { %>
+        <%- include(`../${itemPartial}`, { item }) %>
+      <% }) %>
+    </ul>
+  <% } %>
+</div>

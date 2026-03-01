@@ -1,10 +1,86 @@
 const express = require("express");
 const session = require("express-session");
+let SqliteStoreFactory = null;
+try {
+  // Optional dependency during local/dev recovery. Falls back to memory store when missing.
+  SqliteStoreFactory = require("better-sqlite3-session-store");
+} catch (error) {
+  SqliteStoreFactory = null;
+}
+let swaggerUi = null;
+let YAML = null;
+try {
+  swaggerUi = require("swagger-ui-express");
+  YAML = require("yamljs");
+} catch (error) {
+  swaggerUi = null;
+  YAML = null;
+}
 const path = require("node:path");
 const { randomUUID } = require("node:crypto");
+let multer = null;
+try {
+  multer = require("multer");
+} catch (error) {
+  multer = null;
+}
 const { version: APP_VERSION = "0.0.0" } = require("../package.json");
+let env = null;
+try {
+  env = require("./config/env");
+} catch (error) {
+  env = null;
+}
 const db = require("./db");
-const { parseAppointment, AiParseError } = require("./ai");
+let logger = console;
+try {
+  logger = require("./lib/logger");
+} catch (error) {
+  logger = console;
+}
+let requestContext = (req, res, next) => next();
+try {
+  ({ requestContext } = require("./middleware/requestContext"));
+} catch (error) {
+  requestContext = (req, res, next) => next();
+}
+let installSecurity = () => {};
+try {
+  ({ installSecurity } = require("./middleware/security"));
+} catch (error) {
+  installSecurity = () => {};
+}
+let notFoundHandler = (req, res) => res.status(404).render("404", { title: "Not Found" });
+let errorHandler = (error, req, res, next) => {
+  if (res.headersSent) {
+    return;
+  }
+  console.error(error);
+  res.status(500).render("error", {
+    title: "Server Error",
+    message: "Something went wrong. Please try again."
+  });
+};
+try {
+  ({ notFoundHandler, errorHandler } = require("./middleware/errorHandler"));
+} catch (error) {
+  // keep fallback handlers
+}
+let authRoutes = null;
+let apiRoutes = null;
+try {
+  authRoutes = require("./routes/authRoutes");
+  apiRoutes = require("./routes/api");
+} catch (error) {
+  authRoutes = null;
+  apiRoutes = null;
+}
+const {
+  parseAppointment,
+  appendHighPriorityAuditLog,
+  isHighPriorityAppointment,
+  AiParseError
+} = require("./ai");
 const {
   hasGoogleConfig,
   isGoogleConnected,
@@ -14,6 +90,11 @@ const {
   setGoogleTokensOnSession,
   clearGoogleSession,
   createGoogleEventFromSession,
+  createTodoEventFromSession,
+  listTodoEventsFromSession,
+  parseLocalDateTime,
+  deleteTodoEventFromSession,
+  listGoogleCalendarEvents,
   GoogleCalendarError
 } = require("./googleCalendar");
 const {
@@ -31,16 +112,34 @@ const {
   buildOccurrenceItems,
   detectConflicts
 } = require("./recurrence");
+const { matchesAppointmentQuery } = require("./lib/search");
 require("dotenv").config({ quiet: true });
 
 const app = express();
+const SqliteStore = SqliteStoreFactory ? SqliteStoreFactory(session) : null;
+const upload = multer
+  ? multer({
+      storage: multer.memoryStorage(),
+      limits: {
+        fileSize: 8 * 1024 * 1024
+      }
+    })
+  : null;
+const fallbackEnv = {
+  app: {
+    authRequired: false,
+    port: Number.parseInt(String(process.env.PORT || "3000"), 10) || 3000,
+    host: "0.0.0.0"
+  },
+  session: {
+    maxAgeMs: 1000 * 60 * 60 * 24 * 14
+  }
+};
+const runtimeEnv = env || fallbackEnv;
 const SESSION_SECRET = process.env.SESSION_SECRET || "appointment-vault-session-secret-change-me";
 const IS_PRODUCTION = process.env.NODE_ENV === "production";
-const TEST_PROFILE_ENABLED = !["0", "false", "off", "no"].includes(
-  String(process.env.TEMP_TEST_PROFILE || "true")
-    .trim()
-    .toLowerCase()
-);
+const AUTH_REQUIRED = runtimeEnv.app.authRequired;
+const TEST_PROFILE_ENABLED = false;
 const TEST_PROFILE_NAME =
   String(process.env.TEST_PROFILE_NAME || "").trim() || "Temporary Test Profile";
 const TEST_PROFILE_EMAIL =
@@ -119,6 +218,25 @@ const updateAppointmentOwnerStatement = db.prepare(
   "UPDATE appointments SET userId = ? WHERE userId IS NULL"
 );
 const selectAnyUserStatement = db.prepare("SELECT id FROM users ORDER BY id ASC LIMIT 1");
+const insertCheckinDocumentStatement = db.prepare(
+  `INSERT INTO checkin_documents
+    (userId, title, description, fileName, mimeType, sizeBytes, fileData, createdAt)
+   VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+);
+const selectCheckinDocumentsStatement = db.prepare(
+  `SELECT id, title, description, fileName, mimeType, sizeBytes, createdAt
+   FROM checkin_documents
+   WHERE userId = ?
+   ORDER BY createdAt DESC`
+);
+const selectCheckinDocumentByIdStatement = db.prepare(
+  `SELECT *
+   FROM checkin_documents
+   WHERE id = ? AND userId = ?`
+);
+const deleteCheckinDocumentStatement = db.prepare(
+  "DELETE FROM checkin_documents WHERE id = ? AND userId = ?"
+);
 const insertOccurrenceCompletionStatement = db.prepare(
   `INSERT OR IGNORE INTO appointment_occurrence_completions
     (userId, appointmentId, occurrenceKey, completedAt, createdAt)
@@ -129,7 +247,7 @@ const selectOccurrenceCompletionsForUserStatement = db.prepare(
    FROM appointment_occurrence_completions
    WHERE userId = ?`
 );
-const selectOccurrenceCompletionByKeyStatement = db.prepare(
+const _selectOccurrenceCompletionByKeyStatement = db.prepare(
   `SELECT id
    FROM appointment_occurrence_completions
    WHERE userId = ? AND appointmentId = ? AND occurrenceKey = ?
@@ -145,11 +263,23 @@ const selectAppointmentsForUserStatement = db.prepare(
 app.set("view engine", "ejs");
 app.set("views", path.join(__dirname, "views"));
 
+app.use(requestContext);
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 app.use(
   session({
     secret: SESSION_SECRET,
+    ...(SqliteStore
+      ? {
+          store: new SqliteStore({
+            client: db,
+            expired: {
+              clear: true,
+              intervalMs: 15 * 60 * 1000
+            }
+          })
+        }
+      : {}),
     resave: false,
     saveUninitialized: false,
     proxy: IS_PRODUCTION,
@@ -157,10 +287,11 @@ app.use(
       httpOnly: true,
       sameSite: "lax",
       secure: IS_PRODUCTION,
-      maxAge: 1000 * 60 * 60 * 24 * 14
+      maxAge: runtimeEnv.session.maxAgeMs
     }
   })
 );
+installSecurity(app);
 app.use((req, res, next) => {
   if (TEST_PROFILE_ENABLED) {
     req.session.testProfile = {
@@ -206,7 +337,7 @@ app.use((req, res, next) => {
       req.session.userId = user.id;
     }
 
-    if (!user) {
+    if (!user && !AUTH_REQUIRED) {
       const fallback = selectAnyUserStatement.get();
       if (fallback?.id) {
         user = selectUserByIdStatement.get(fallback.id) || null;
@@ -216,7 +347,7 @@ app.use((req, res, next) => {
       }
     }
 
-    if (!user) {
+    if (!user && !AUTH_REQUIRED) {
       user = upsertUserFromIdentity({
         provider: "local",
         providerUserId: "local-default",
@@ -237,6 +368,24 @@ app.use((req, res, next) => {
     next(error);
   }
 });
+app.use((req, res, next) => {
+  const publicPrefixes = ["/public", "/health", "/version", "/twilio", "/auth", "/api/docs"];
+  const isApiPath = req.path.startsWith("/api/");
+  const isPublic = publicPrefixes.some(
+    (prefix) => req.path === prefix || req.path.startsWith(`${prefix}/`)
+  );
+  if (!AUTH_REQUIRED || req.currentUser || isPublic) {
+    next();
+    return;
+  }
+
+  if (isApiPath) {
+    res.status(401).json({ ok: false, message: "Authentication required." });
+    return;
+  }
+
+  res.redirect("/auth/login");
+});
 app.use("/public", express.static(path.join(__dirname, "public")));
 app.use((req, res, next) => {
   const hasRealGoogleConnection =
@@ -250,9 +399,24 @@ app.use((req, res, next) => {
   res.locals.testProfileActive = testProfileActive;
   res.locals.testProfile = testProfile;
   res.locals.currentUser = req.currentUser || null;
+  res.locals.authRequired = AUTH_REQUIRED;
   res.locals.formatDisplayTime = formatDisplayTime;
   next();
 });
+
+if (authRoutes) {
+  app.use("/auth", authRoutes);
+}
+if (apiRoutes) {
+  app.use("/api", apiRoutes);
+}
+if (swaggerUi && YAML) {
+  app.use(
+    "/api/docs",
+    swaggerUi.serve,
+    swaggerUi.setup(YAML.load(path.join(__dirname, "docs", "openapi.yaml")))
+  );
+}
 
 function getPersistedGoogleTokens() {
   const row = selectAppSettingStatement.get(GOOGLE_TOKENS_SETTING_KEY);
@@ -610,7 +774,7 @@ function getCurrentUser(req) {
   return req.currentUser || null;
 }
 
-function getCurrentUserId(req) {
+function _getCurrentUserId(req) {
   return req.currentUser?.id || null;
 }
 
@@ -905,7 +1069,7 @@ function renderAgentPage(res, options = {}) {
   });
 }
 
-function escapeXml(value) {
+function _escapeXml(value) {
   return String(value ?? "")
     .replaceAll("&", "&amp;")
     .replaceAll("<", "&lt;")
@@ -966,6 +1130,41 @@ function formatVoiceTime(appointmentDateTime) {
     minute: "2-digit",
     hour12: true
   });
+}
+
+const CHECKIN_ALLOWED_MIME = new Set([
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "application/pdf",
+  "application/msword",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+]);
+
+function isCheckinMimeAllowed(mimeType) {
+  return CHECKIN_ALLOWED_MIME.has(String(mimeType || "").toLowerCase());
+}
+
+function toSafeFileName(fileName) {
+  return String(fileName || "document")
+    .replace(/[/\\]/g, "_")
+    .replace(/[\r\n"]/g, "");
+}
+
+function buildGoogleCalendarEmbedUrl(calendarId, timezone) {
+  const safeCalendarId = String(calendarId || "primary").trim() || "primary";
+  const safeTimezone = String(timezone || APP_TIMEZONE).trim() || APP_TIMEZONE;
+  const params = new URLSearchParams({
+    src: safeCalendarId,
+    ctz: safeTimezone,
+    mode: "WEEK",
+    showTitle: "0",
+    showPrint: "0",
+    showTabs: "0",
+    showCalendars: "0",
+    showTz: "0"
+  });
+  return `https://calendar.google.com/calendar/embed?${params.toString()}`;
 }
 
 function getTodayAppointments(userId, now = new Date()) {
@@ -1050,7 +1249,7 @@ function buildTodayVoiceMessage(userId, requestedAppointmentId, now = new Date()
 
 app.get("/auth/google", (req, res, next) => {
   if (TEST_PROFILE_ENABLED) {
-    res.redirect("/?google=test_profile");
+    res.redirect("/dashboard?google=test_profile");
     return;
   }
 
@@ -1073,7 +1272,7 @@ app.get("/auth/google", (req, res, next) => {
 app.get("/auth/google/callback", async (req, res, next) => {
   const code = String(req.query.code || "");
   if (!code) {
-    res.redirect("/?google=auth_error");
+    res.redirect("/dashboard?google=auth_error");
     return;
   }
 
@@ -1091,10 +1290,10 @@ app.get("/auth/google/callback", async (req, res, next) => {
         assignLegacyAppointmentsToUser(user.id);
       }
     }
-    res.redirect("/?google=connected");
+    res.redirect("/dashboard?google=connected");
   } catch (error) {
     if (error instanceof GoogleCalendarError) {
-      res.redirect("/?google=auth_error");
+      res.redirect("/dashboard?google=auth_error");
       return;
     }
 
@@ -1104,7 +1303,7 @@ app.get("/auth/google/callback", async (req, res, next) => {
 
 app.post("/auth/google/disconnect", (req, res) => {
   if (TEST_PROFILE_ENABLED) {
-    res.redirect("/?google=test_profile");
+    res.redirect("/dashboard?google=test_profile");
     return;
   }
 
@@ -1114,7 +1313,7 @@ app.post("/auth/google/disconnect", (req, res) => {
   if (req.session?.userId) {
     delete req.session.userId;
   }
-  res.redirect("/?google=disconnected");
+  res.redirect("/dashboard?google=disconnected");
 });
 
 app.get("/health", (req, res) => {
@@ -1229,48 +1428,144 @@ app.post("/settings/test-call", async (req, res) => {
   }
 });
 
+function normalizeDashboardFilters(query = {}) {
+  return {
+    title: String(query.title || "").trim(),
+    dateFrom: String(query.dateFrom || "").trim(),
+    dateTo: String(query.dateTo || "").trim()
+  };
+}
+
+async function buildDashboardData(userId, filters, options = {}) {
+  const now = options.now instanceof Date ? options.now : new Date();
+  const session = options.session || null;
+  const todayDate = formatLocalDate(now);
+  const nowTime = formatLocalTime(now);
+  const endOfWeekDate = getEndOfWeekDateString(todayDate);
+  let appointments = getAppointmentsForUserWithOccurrences(userId, {
+    now,
+    daysAhead: 60
+  });
+
+  const rangeStartIso = new Date(`${todayDate}T00:00:00`).toISOString();
+  const rangeEndDate = new Date(now.getTime() + 60 * 24 * 60 * 60 * 1000);
+  const rangeEndIso = rangeEndDate.toISOString();
+  try {
+    if (session && isGoogleConnected(session)) {
+      const googleEvents = await listGoogleCalendarEvents(session, {
+        startIso: rangeStartIso,
+        endIso: rangeEndIso,
+        maxResults: 500
+      });
+      const googleById = new Map(
+        googleEvents
+          .filter((event) => String(event.googleEventId || "").trim())
+          .map((event) => [String(event.googleEventId).trim(), event])
+      );
+
+      appointments = appointments.map((appointment) => {
+        const linkedId = String(appointment.googleEventId || "").trim();
+        if (!linkedId || !googleById.has(linkedId)) {
+          return appointment;
+        }
+        const remote = googleById.get(linkedId);
+        return {
+          ...appointment,
+          title: remote.title || appointment.title,
+          date: remote.date || appointment.date,
+          time: remote.time || appointment.time,
+          location: remote.location || appointment.location,
+          notes: remote.notes || appointment.notes,
+          syncedFromGoogle: true
+        };
+      });
+
+      const unmatchedGoogle = googleEvents.filter((event) => {
+        const eventId = String(event.googleEventId || "").trim();
+        if (!eventId) {
+          return true;
+        }
+        return !appointments.some(
+          (appointment) => String(appointment.googleEventId || "").trim() === eventId
+        );
+      });
+
+      appointments = [...appointments, ...unmatchedGoogle];
+    }
+  } catch (error) {
+    // Keep dashboard usable even if Google read sync fails.
+  }
+
+  if (filters.title) {
+    appointments = appointments.filter((appointment) =>
+      matchesAppointmentQuery(appointment, filters.title)
+    );
+  }
+  if (/^\d{4}-\d{2}-\d{2}$/.test(filters.dateFrom)) {
+    appointments = appointments.filter(
+      (appointment) => String(appointment.date || "") >= filters.dateFrom
+    );
+  }
+  if (/^\d{4}-\d{2}-\d{2}$/.test(filters.dateTo)) {
+    appointments = appointments.filter(
+      (appointment) => String(appointment.date || "") <= filters.dateTo
+    );
+  }
+
+  return {
+    appointments,
+    todayAppointments: appointments.filter(
+      (appointment) =>
+        !appointment.isHistory &&
+        appointment.date === todayDate &&
+        appointment.time >= nowTime
+    ),
+    thisWeekAppointments: appointments.filter(
+      (appointment) =>
+        !appointment.isHistory &&
+        appointment.date >= todayDate &&
+        appointment.date <= endOfWeekDate
+    ),
+    upcomingAppointments: appointments.filter(
+      (appointment) => !appointment.isHistory && appointment.date > endOfWeekDate
+    )
+  };
+}
+
 app.get("/", (req, res) => {
+  if (Object.keys(req.query || {}).length > 0) {
+    const queryString = new URLSearchParams(req.query).toString();
+    res.redirect(queryString ? `/dashboard?${queryString}` : "/dashboard");
+    return;
+  }
+
+  res.redirect("/calendar");
+});
+
+app.get("/dashboard", async (req, res) => {
   const user = requireCurrentUser(req, res);
   if (!user) {
     return;
   }
 
+  const filters = normalizeDashboardFilters(req.query);
   const viewModel = {
     title: "Appointment Vault",
     appointments: [],
     todayAppointments: [],
     thisWeekAppointments: [],
     upcomingAppointments: [],
-    googleStatusMessage: ""
+    googleStatusMessage: "",
+    calendarEmbedUrl: "",
+    filters,
+    todoStatusMessage: "",
+    todoItems: []
   };
 
   try {
-    const now = new Date();
-    const todayDate = formatLocalDate(now);
-    const nowTime = formatLocalTime(now);
-    const endOfWeekDate = getEndOfWeekDateString(todayDate);
-
-    const appointments = getAppointmentsForUserWithOccurrences(user.id, {
-      now,
-      daysAhead: 60
+    const dashboardData = await buildDashboardData(user.id, filters, {
+      session: req.session || null
     });
-
-    const todayAppointments = appointments.filter(
-      (appointment) =>
-        !appointment.isHistory &&
-        appointment.date === todayDate &&
-        appointment.time >= nowTime
-    );
-    const thisWeekAppointments = appointments.filter(
-      (appointment) =>
-        !appointment.isHistory &&
-        appointment.date >= todayDate &&
-        appointment.date <= endOfWeekDate
-    );
-    const upcomingAppointments = appointments.filter(
-      (appointment) => !appointment.isHistory && appointment.date > endOfWeekDate
-    );
-
     const googleStatusMessage =
       req.query.google === "connected"
         ? "Google Calendar connected."
@@ -1278,17 +1573,40 @@ app.get("/", (req, res) => {
           ? "Google Calendar disconnected."
           : req.query.google === "test_profile"
             ? "Temporary test profile is active. Google sign-in is bypassed."
-          : req.query.google === "auth_error"
-            ? "Google sign-in failed. Please try connecting again."
-            : "";
+            : req.query.google === "auth_error"
+              ? "Google sign-in failed. Please try connecting again."
+              : "";
+
+    const todoStatusMessage =
+      req.query.todo === "created"
+        ? "To-Do added to Google Calendar."
+        : req.query.todo === "completed"
+          ? "To-Do completed."
+        : req.query.todo === "missing"
+          ? "Please enter a to-do title."
+        : req.query.todo === "google_required"
+          ? "Connect Google Calendar to add To-Dos."
+        : req.query.todo === "error"
+              ? "Unable to add To-Do right now."
+              : "";
+
+    let todoItems = [];
+    try {
+      todoItems = await listTodoEventsFromSession(req.session, { maxResults: 8 });
+    } catch (todoError) {
+      todoItems = [];
+    }
 
     res.render("index", {
       ...viewModel,
-      appointments,
-      todayAppointments,
-      thisWeekAppointments,
-      upcomingAppointments,
-      googleStatusMessage
+      ...dashboardData,
+      googleStatusMessage,
+      todoStatusMessage,
+      todoItems,
+      calendarEmbedUrl: buildGoogleCalendarEmbedUrl(
+        String(user.email || req.persistedGoogleProfile?.email || "primary").trim() || "primary",
+        user.timezone || APP_TIMEZONE
+      )
     });
   } catch (error) {
     console.error("Home page load failed:", error.message);
@@ -1296,6 +1614,130 @@ app.get("/", (req, res) => {
       ...viewModel,
       googleStatusMessage: "Unable to load appointments right now."
     });
+  }
+});
+
+app.get("/appointments", async (req, res) => {
+  const user = requireCurrentUser(req, res);
+  if (!user) {
+    return;
+  }
+
+  const filters = normalizeDashboardFilters(req.query);
+  const viewModel = {
+    title: "Appointments",
+    appointments: [],
+    todayAppointments: [],
+    thisWeekAppointments: [],
+    upcomingAppointments: [],
+    filters,
+    todoStatusMessage: "",
+    todoItems: []
+  };
+
+  try {
+    const dashboardData = await buildDashboardData(user.id, filters, {
+      session: req.session || null
+    });
+
+    const todoStatusMessage =
+      req.query.todo === "created"
+        ? "To-Do added to Google Calendar."
+        : req.query.todo === "completed"
+          ? "To-Do completed."
+        : req.query.todo === "missing"
+          ? "Please enter a to-do title."
+        : req.query.todo === "google_required"
+          ? "Connect Google Calendar to add To-Dos."
+        : req.query.todo === "error"
+          ? "Unable to add To-Do right now."
+          : "";
+
+    let todoItems = [];
+    try {
+      todoItems = await listTodoEventsFromSession(req.session, { maxResults: 12 });
+    } catch (todoError) {
+      todoItems = [];
+    }
+
+    res.render("appointments/index", {
+      ...viewModel,
+      ...dashboardData,
+      todoStatusMessage,
+      todoItems
+    });
+  } catch (error) {
+    console.error("Appointments list load failed:", error.message);
+    res.status(500).render("appointments/index", {
+      ...viewModel
+    });
+  }
+});
+
+app.post("/dashboard/todo", async (req, res) => {
+  const user = requireCurrentUser(req, res);
+  if (!user) {
+    return;
+  }
+
+  const todoTitle = String(req.body?.todoTitle || "").trim();
+  if (!todoTitle) {
+    res.redirect("/appointments?todo=missing");
+    return;
+  }
+
+  try {
+    const startDate = parseLocalDateTime(req.body?.todoDate, req.body?.todoTime);
+    const durationMinutes = Number.parseInt(String(req.body?.todoDuration || "30"), 10) || 30;
+    await createTodoEventFromSession(req.session, todoTitle, {
+      startDate,
+      durationMinutes
+    });
+    persistGoogleTokens(req.session?.googleTokens);
+    res.redirect("/appointments?todo=created");
+  } catch (error) {
+    if (error instanceof GoogleCalendarError) {
+      res.redirect("/appointments?todo=google_required");
+      return;
+    }
+    console.error("To-Do creation failed:", error.message);
+    res.redirect("/appointments?todo=error");
+  }
+});
+
+app.post("/dashboard/todo/complete", async (req, res) => {
+  const user = requireCurrentUser(req, res);
+  if (!user) {
+    return;
+  }
+
+  try {
+    await deleteTodoEventFromSession(req.session, {
+      todoEventId: req.body?.todoEventId,
+      syncId: req.body?.todoSyncId
+    });
+    persistGoogleTokens(req.session?.googleTokens);
+    res.redirect("/appointments?todo=completed");
+  } catch (error) {
+    console.error("To-Do completion failed:", error.message);
+    res.redirect("/appointments?todo=error");
+  }
+});
+
+app.get("/partials/appointments-sections", async (req, res) => {
+  const user = requireCurrentUser(req, res);
+  if (!user) {
+    return;
+  }
+
+  const filters = normalizeDashboardFilters(req.query);
+  try {
+    const dashboardData = await buildDashboardData(user.id, filters, {
+      session: req.session || null
+    });
+    res.render("partials/appointments-sections", dashboardData);
+  } catch (error) {
+    res.status(500).send("<p class=\"section-empty\">Unable to refresh appointments right now.</p>");
   }
 });
 
@@ -1403,9 +1845,145 @@ app.get("/checkin", (req, res) => {
     return;
   }
 
-  res.render("checkin", {
-    title: "Check-In Portal"
+  res.redirect("/calendar#checkin");
+});
+app.get("/calendar", (req, res) => {
+  const user = requireCurrentUser(req, res);
+  if (!user) {
+    return;
+  }
+
+  const profile = req.persistedGoogleProfile || null;
+  const calendarId = String(user.email || profile?.email || "primary").trim() || "primary";
+  res.render("calendar", {
+    title: "Calendar",
+    calendarEmbedUrl: buildGoogleCalendarEmbedUrl(calendarId, user.timezone || APP_TIMEZONE),
+    checkinDocuments: selectCheckinDocumentsStatement.all(user.id),
+    checkinDocStatus: String(req.query.doc || ""),
+    checkinUploadAvailable: Boolean(upload)
   });
+});
+
+app.post("/calendar/checkin-documents", (req, res, next) => {
+  const user = requireCurrentUser(req, res);
+  if (!user) {
+    return;
+  }
+
+  if (!upload) {
+    res.redirect("/calendar?doc=unavailable");
+    return;
+  }
+
+  upload.single("documentFile")(req, res, (err) => {
+    if (err) {
+      if (err.code === "LIMIT_FILE_SIZE") {
+        res.redirect("/calendar?doc=too_large");
+        return;
+      }
+      next(err);
+      return;
+    }
+
+    const file = req.file;
+    if (!file) {
+      res.redirect("/calendar?doc=missing");
+      return;
+    }
+
+    if (!isCheckinMimeAllowed(file.mimetype)) {
+      res.redirect("/calendar?doc=unsupported");
+      return;
+    }
+
+    const title = String(req.body?.docTitle || "").trim();
+    const description = String(req.body?.docDescription || "").trim();
+    const createdAt = new Date().toISOString();
+
+    try {
+      insertCheckinDocumentStatement.run(
+        user.id,
+        title || null,
+        description || null,
+        String(file.originalname || "document"),
+        String(file.mimetype || "application/octet-stream"),
+        file.size || 0,
+        file.buffer,
+        createdAt
+      );
+      res.redirect("/calendar?doc=uploaded#checkin-docs");
+    } catch (error) {
+      console.error("Check-In document upload failed:", error.message);
+      res.redirect("/calendar?doc=error");
+    }
+  });
+});
+
+app.get("/calendar/checkin-documents/:id", (req, res) => {
+  const user = requireCurrentUser(req, res);
+  if (!user) {
+    return;
+  }
+
+  const docId = Number.parseInt(String(req.params.id || ""), 10);
+  if (!Number.isInteger(docId)) {
+    res.status(404).render("404", { title: "Not Found" });
+    return;
+  }
+
+  const record = selectCheckinDocumentByIdStatement.get(docId, user.id);
+  if (!record) {
+    res.status(404).render("404", { title: "Not Found" });
+    return;
+  }
+
+  res.setHeader("Content-Type", record.mimeType);
+  const download = String(req.query.download || "") === "1";
+  if (download) {
+    res.setHeader("Content-Disposition", `attachment; filename="${toSafeFileName(record.fileName)}"`);
+  }
+  res.send(record.fileData);
+});
+
+app.post("/calendar/checkin-documents/:id/delete", (req, res) => {
+  const user = requireCurrentUser(req, res);
+  if (!user) {
+    return;
+  }
+
+  const docId = Number.parseInt(String(req.params.id || ""), 10);
+  if (!Number.isInteger(docId)) {
+    res.redirect("/calendar?doc=missing");
+    return;
+  }
+
+  deleteCheckinDocumentStatement.run(docId, user.id);
+  res.redirect("/calendar?doc=deleted#checkin-docs");
+});
+app.get("/api/calendar/events", (req, res) => {
+  const user = requireCurrentUser(req, res);
+  if (!user) {
+    return;
+  }
+
+  const rangeStart = String(req.query.start || "").trim();
+  const rangeEnd = String(req.query.end || "").trim();
+  const safeStart = /^\d{4}-\d{2}-\d{2}/.test(rangeStart) ? rangeStart.slice(0, 10) : "";
+  const safeEnd = /^\d{4}-\d{2}-\d{2}/.test(rangeEnd) ? rangeEnd.slice(0, 10) : "";
+
+  const now = new Date();
+  const items = getAppointmentsForUserWithOccurrences(user.id, { now, daysAhead: 365 })
+    .filter((appointment) => !appointment.isHistory)
+    .filter((appointment) => (safeStart ? appointment.date >= safeStart : true))
+    .filter((appointment) => (safeEnd ? appointment.date <= safeEnd : true))
+    .map((appointment) => ({
+      id: String(appointment.id),
+      title: appointment.title,
+      start: `${appointment.date}T${appointment.time}:00`,
+      allDay: false
+    }));
+
+  res.json(items);
 });
 app.get("/settings/history", renderSettingsHistoryPage);
 app.get(/^\/settings.*$/i, renderSettingsPage);
@@ -1538,7 +2116,52 @@ app.get("/agent", (req, res) => {
   if (!user) {
     return;
   }
-  renderAgentPage(res);
+  res.redirect("/appointments#quick-add");
+});
+
+app.post("/agent/preview", async (req, res) => {
+  const user = requireCurrentUser(req, res);
+  if (!user) {
+    return;
+  }
+
+  const promptText = String(req.body.promptText ?? req.body.quickText ?? "").trim();
+  if (!promptText) {
+    res.render("partials/agent-preview", { parsed: null, previewError: "" });
+    return;
+  }
+
+  try {
+    const parsedByAi = await parseAppointment(promptText, {
+      userId: user.id,
+      memory: req.session?.agentMemory || null,
+      history: Array.isArray(req.session?.agentHistory) ? req.session.agentHistory : [],
+      session: req.session || null
+    });
+    const aiAppointment = parsedByAi.appointment || {};
+    const appointmentInput = normalizeInput({
+      title: aiAppointment.title ?? "",
+      date: aiAppointment.date ?? "",
+      time: aiAppointment.time ?? "",
+      location: aiAppointment.location ?? "",
+      notes: aiAppointment.notes ?? "",
+      tags: aiAppointment.tags ?? "",
+      reminderMinutes:
+        aiAppointment.reminderMinutes === null || aiAppointment.reminderMinutes === undefined
+          ? ""
+          : String(aiAppointment.reminderMinutes)
+    });
+    const appointmentWithDefaults = applyAgentDefaults(appointmentInput);
+    res.render("partials/agent-preview", {
+      parsed: toAgentFormValues(appointmentWithDefaults),
+      previewError: parsedByAi.action === "ask_clarification" ? parsedByAi.message : ""
+    });
+  } catch (error) {
+    res.render("partials/agent-preview", {
+      parsed: null,
+      previewError: error instanceof AiParseError ? error.message : "Unable to parse preview right now."
+    });
+  }
 });
 
 app.post("/agent/parse", async (req, res, next) => {
@@ -1558,20 +2181,48 @@ app.post("/agent/parse", async (req, res, next) => {
   }
 
   try {
-    const parsedByAi = await parseAppointment(promptText);
+    const agentHistory = Array.isArray(req.session?.agentHistory) ? req.session.agentHistory : [];
+    const parsedByAi = await parseAppointment(promptText, {
+      userId: user.id,
+      memory: req.session?.agentMemory || null,
+      history: agentHistory,
+      session: req.session || null
+    });
+    if (req.session) {
+      req.session.agentMemory = parsedByAi.memory || null;
+      req.session.agentHistory = [
+        ...agentHistory.slice(-10),
+        { role: "user", content: promptText },
+        { role: "assistant", appointment: parsedByAi.appointment || null, status: parsedByAi.status || "" }
+      ];
+    }
+
+    const aiAppointment = parsedByAi.appointment || {};
     const appointmentInput = normalizeInput({
-      title: parsedByAi.title ?? "",
-      date: parsedByAi.date ?? "",
-      time: parsedByAi.time ?? "",
-      location: parsedByAi.location ?? "",
-      notes: parsedByAi.notes ?? "",
-      tags: parsedByAi.tags ?? "",
+      title: aiAppointment.title ?? "",
+      date: aiAppointment.date ?? "",
+      time: aiAppointment.time ?? "",
+      location: aiAppointment.location ?? "",
+      notes: aiAppointment.notes ?? "",
+      tags: aiAppointment.tags ?? "",
       reminderMinutes:
-        parsedByAi.reminderMinutes === null || parsedByAi.reminderMinutes === undefined
+        aiAppointment.reminderMinutes === null || aiAppointment.reminderMinutes === undefined
           ? ""
-          : String(parsedByAi.reminderMinutes)
+          : String(aiAppointment.reminderMinutes)
     });
     const appointmentWithDefaults = applyAgentDefaults(appointmentInput);
+
+    if (parsedByAi.action === "ask_clarification") {
+      res.status(400);
+      renderAgentPage(res, {
+        promptText,
+        parsed: toAgentFormValues(appointmentWithDefaults),
+        parseError:
+          parsedByAi.message || "I need more details before I can safely save this appointment.",
+        saveErrors: validateAppointment(appointmentWithDefaults)
+      });
+      return;
+    }
 
     const saveErrors = validateAppointment(appointmentWithDefaults);
     if (saveErrors.title || saveErrors.date || saveErrors.time) {
@@ -1635,6 +2286,21 @@ app.post("/agent/save", async (req, res, next) => {
   }
 
   try {
+    if (req.session) {
+      req.session.agentMemory = {
+        title: appointmentInput.title || "",
+        date: appointmentInput.date || "",
+        time: appointmentInput.time || "",
+        location: appointmentInput.location || null,
+        notes: appointmentInput.notes || null,
+        tags: appointmentInput.tags || null,
+        reminderMinutes:
+          appointmentInput.reminderMinutes === "" || appointmentInput.reminderMinutes === null
+            ? null
+            : Number.parseInt(String(appointmentInput.reminderMinutes), 10) || null
+      };
+    }
+
     const now = new Date().toISOString();
     const record = serializeForDb(appointmentInput);
 
@@ -1652,11 +2318,22 @@ app.post("/agent/save", async (req, res, next) => {
       updatedAt: now
     });
 
+    if (isHighPriorityAppointment(record)) {
+      appendHighPriorityAuditLog(record, { userId: user.id });
+    }
+
     try {
       if (isGoogleConnected(req.session)) {
         const appointment = getAppointmentById(Number(insertInfo.lastInsertRowid), user.id);
         if (appointment) {
-          await createGoogleEventFromSession(req.session, appointment);
+          const googleEventId = await createGoogleEventFromSession(req.session, appointment);
+          if (googleEventId) {
+            db.prepare(
+              `UPDATE appointments
+               SET googleEventId = ?, updatedAt = ?
+               WHERE id = ? AND userId = ?`
+            ).run(googleEventId, new Date().toISOString(), Number(insertInfo.lastInsertRowid), user.id);
+          }
           persistGoogleTokens(req.session.googleTokens);
         }
       }
@@ -1668,7 +2345,7 @@ app.post("/agent/save", async (req, res, next) => {
       console.error("Google Calendar sync failed:", error.message);
     }
 
-    res.redirect("/");
+    res.redirect("/dashboard");
   } catch (error) {
     next(error);
   }
@@ -1743,11 +2420,22 @@ app.post("/appointments", async (req, res, next) => {
       updatedAt: now
     });
 
+    if (isHighPriorityAppointment(record)) {
+      appendHighPriorityAuditLog(record, { userId: user.id });
+    }
+
     try {
       if (isGoogleConnected(req.session)) {
         const appointment = getAppointmentById(Number(insertInfo.lastInsertRowid), user.id);
         if (appointment) {
-          await createGoogleEventFromSession(req.session, appointment);
+          const googleEventId = await createGoogleEventFromSession(req.session, appointment);
+          if (googleEventId) {
+            db.prepare(
+              `UPDATE appointments
+               SET googleEventId = ?, updatedAt = ?
+               WHERE id = ? AND userId = ?`
+            ).run(googleEventId, new Date().toISOString(), Number(insertInfo.lastInsertRowid), user.id);
+          }
           persistGoogleTokens(req.session.googleTokens);
         }
       }
@@ -1759,7 +2447,7 @@ app.post("/appointments", async (req, res, next) => {
       console.error("Google Calendar sync failed:", error.message);
     }
 
-    res.redirect("/");
+    res.redirect("/dashboard");
   } catch (error) {
     next(error);
   }
@@ -1989,7 +2677,11 @@ app.post("/appointments/:id/delete", async (req, res, next) => {
     }
 
     db.prepare("DELETE FROM appointments WHERE id = ? AND userId = ?").run(id, user.id);
-    res.redirect("/");
+    if (String(req.query.partial || "") === "1") {
+      res.status(200).send("");
+      return;
+    }
+    res.redirect("/dashboard");
   } catch (error) {
     next(error);
   }
@@ -2101,7 +2793,7 @@ function completeAppointment(req, res, next) {
         res.redirect("/settings");
         return;
       }
-      res.redirect("/");
+      res.redirect("/dashboard");
       return;
     }
 
@@ -2124,7 +2816,7 @@ function completeAppointment(req, res, next) {
       return;
     }
 
-    res.redirect("/");
+    res.redirect("/dashboard");
   } catch (error) {
     next(error);
   }
@@ -2144,23 +2836,20 @@ app.all(/^\/appointments\/([^/]+)\/complete\/?$/i, (req, res, next) => {
   completeAppointment(req, res, next);
 });
 
-app.use((req, res) => {
-  res.status(404).render("404", { title: "Not Found" });
-});
-
-app.use((error, req, res, next) => {
-  console.error(error);
-  res.status(500).render("error", {
-    title: "Server Error",
-    message: "Something went wrong. Please try again."
-  });
-});
+app.use(notFoundHandler);
+app.use(errorHandler);
 
 logTwilioEnvStatus();
 startReminderScheduler();
 
-const PORT = process.env.PORT || 3000;
+if (require.main === module) {
+  app.listen(runtimeEnv.app.port, runtimeEnv.app.host, () => {
+    if (typeof logger.info === "function") {
+      logger.info(`Appointment Vault listening on ${runtimeEnv.app.host}:${runtimeEnv.app.port}`);
+    } else {
+      console.log(`Appointment Vault listening on ${runtimeEnv.app.host}:${runtimeEnv.app.port}`);
+    }
+  });
+}
 
-app.listen(PORT, "0.0.0.0", () => {
-  console.log(`Appointment Vault listening on ${PORT}`);
-});
+module.exports = app;

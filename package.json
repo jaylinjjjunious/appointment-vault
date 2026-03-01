@@ -5,6 +5,9 @@
   "main": "src/app.js",
   "scripts": {
     "dev": "node src/app.js",
+    "ui:build": "tailwindcss -i ./src/public/tailwind.css -o ./src/public/app.css",
+    "ui:watch": "tailwindcss -i ./src/public/tailwind.css -o ./src/public/app.css --watch",
+    "ui:dev": "npm run ui:watch",
     "dev:ensure": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/ensure.ps1",
     "dev:nodemon": "nodemon src/app.js",
     "start": "node src/app.js",
@@ -26,7 +29,13 @@
     "stable:status": "set \"PM2_HOME=.pm2\"&& npx pm2 status appointment-vault",
     "stable:logs": "set \"PM2_HOME=.pm2\"&& npx pm2 logs appointment-vault --lines 100",
     "stable:save": "set \"PM2_HOME=.pm2\"&& npx pm2 save",
-    "lint": "node scripts/lint-lite.js",
+    "lint": "eslint . --ext .js,.cjs --max-warnings=0",
+    "format": "prettier --write .",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "prepare": "husky",
+    "backup:db": "node scripts/backup-db.js",
+    "restore:db": "node scripts/restore-db.js",
     "test:smoke": "node scripts/smoke.js",
     "qa": "npm run lint && npm run test:smoke"
   },
@@ -40,16 +49,39 @@
   "license": "MIT",
   "dependencies": {
     "better-sqlite3": "^11.10.0",
+    "better-sqlite3-session-store": "^0.1.0",
+    "bcrypt": "^5.1.1",
+    "csurf": "^1.11.0",
     "dotenv": "^17.3.1",
     "ejs": "^3.1.10",
     "express": "^4.21.2",
+    "express-rate-limit": "^7.4.1",
     "express-session": "^1.19.0",
     "googleapis": "^171.4.0",
+    "multer": "^1.4.5-lts.1",
     "node-cron": "^4.2.1",
-    "twilio": "^5.12.2"
+    "nodemailer": "^6.9.15",
+    "pino": "^9.5.0",
+    "pino-http": "^10.3.0",
+    "swagger-ui-express": "^5.0.1",
+    "twilio": "^5.12.2",
+    "yamljs": "^0.3.0",
+    "zod": "^3.23.8"
   },
   "devDependencies": {
+    "autoprefixer": "^10.4.19",
+    "daisyui": "^4.12.12",
+    "eslint": "^9.13.0",
+    "eslint-config-prettier": "^9.1.0",
+    "husky": "^9.1.6",
+    "lint-staged": "^15.2.10",
     "nodemon": "^3.1.10",
-    "pm2": "^6.0.14"
+    "postcss": "^8.4.41",
+    "pm2": "^6.0.14",
+    "pino-pretty": "^11.2.2",
+    "prettier": "^3.3.3",
+    "supertest": "^7.0.0",
+    "tailwindcss": "^3.4.17",
+    "vitest": "^2.1.4"
   }
 }

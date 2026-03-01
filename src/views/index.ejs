@@ -37,194 +37,202 @@
     typeof testProfileActive !== "undefined" ? testProfileActive : false;
   const safeTestProfile =
     typeof testProfile !== "undefined" && testProfile ? testProfile : null;
+  const todayCount = safeTodayAppointments.length;
+  const weekCount = safeThisWeekAppointments.length;
+  const upcomingCount = safeUpcomingAppointments.length;
+  const totalCount = todayCount + weekCount + upcomingCount;
+  const nextFocus =
+    safeTodayAppointments.find((appointment) => !appointment.isCompleted) ||
+    safeThisWeekAppointments.find((appointment) => !appointment.isCompleted) ||
+    safeUpcomingAppointments.find((appointment) => !appointment.isCompleted) ||
+    null;
+  const hasAnyAppointments = todayCount + weekCount + upcomingCount > 0;
 %>
 
-<section class="page-heading">
-  <h1>All Appointments</h1>
-  <p>Track your upcoming plans in one place.</p>
-</section>
-
-<section class="card glass-panel quick-add-card">
-  <h2>Quick Add</h2>
-  <form class="form-grid" action="/agent/parse" method="POST">
-    <div class="form-field">
-      <label for="quickText">Add appointment in plain language</label>
-      <textarea
-        id="quickText"
-        name="quickText"
-        rows="4"
-        class="agent-textarea glass-input"
-        placeholder="Dentist tomorrow 3pm remind 30&#10;Court 2/25 8:30am&#10;Job interview Friday 10am at 4900 California Ave"
-      ></textarea>
-    </div>
-    <div class="actions">
-      <button class="button glass-button" type="submit">Create</button>
-      <a class="button glass-button button-secondary" href="/appointments/new">Manual Add</a>
-    </div>
-  </form>
-  <p class="quick-hint">Examples: “Dentist tomorrow 3pm remind 30”, “Court 2/25 8:30am”</p>
-</section>
-
-<% if (googleStatusMessage) { %>
-  <section class="card glass-panel status-card">
-    <p><%= googleStatusMessage %></p>
-  </section>
-<% } %>
-
-<% if (safeTestProfileActive && safeTestProfile) { %>
-  <section class="card glass-panel status-card">
-    <p>
-      <strong>Temporary Test Profile:</strong>
-      <%= safeTestProfile.name %> (<%= safeTestProfile.email %>)
+<section id="dashboard-top" class="dashboard-intro glass-panel flex flex-col lg:flex-row lg:items-center gap-6 hero-card">
+  <div class="dashboard-intro-main flex-1">
+    <p class="hero-kicker">Welcome.</p>
+    <h1 class="text-3xl font-bold tracking-tight">👋 Welcome back!</h1>
+    <p class="text-base-content/70 mt-2">
+      Plan your day, catch conflicts early, and add appointments faster.
     </p>
-  </section>
-<% } else if (!googleConfigured) { %>
-  <section class="card glass-panel status-card warning-card">
-    <p>Google Calendar OAuth is not configured yet. Add the required Google env values.</p>
-  </section>
-<% } else if (!googleConnected) { %>
-  <section class="card glass-panel status-card warning-card">
-    <p>Google Calendar is not connected yet.</p>
-    <div class="actions">
-      <a class="button glass-button" href="/auth/google">Connect Google Calendar</a>
+    <div class="hero-metric">
+      <span class="hero-metric-label">Total scheduled</span>
+      <strong class="hero-metric-value"><%= totalCount %></strong>
     </div>
-  </section>
-<% } else { %>
-  <section class="card glass-panel status-card">
-    <p><strong>Connected:</strong> Google Calendar stays linked until you disconnect it.</p>
-  </section>
-<% } %>
-
-<section class="calendar-section glass-panel today-section">
-  <h2>Today</h2>
-  <% if (safeTodayAppointments.length === 0) { %>
-    <p class="section-empty">No appointments today.</p>
-  <% } else { %>
-    <div class="list">
-      <% safeTodayAppointments.forEach((appointment) => { %>
-        <article class="card glass-card appointment-card <%= appointment.isCompleted ? 'completed-card' : '' %>">
-          <div class="appointment-main">
-            <h3><strong><%= appointment.title %></strong></h3>
-            <p><strong>Date:</strong> <%= appointment.date %></p>
-            <p><strong>Time:</strong> <%= to12Hour(appointment.time) %></p>
-            <% if (appointment.location) { %>
-              <p><strong>Location:</strong> <%= appointment.location %></p>
-            <% } %>
-            <% if (appointment.reminderMinutes !== null) { %>
-              <p><strong>Reminder:</strong> <%= appointment.reminderMinutes %> min before</p>
-            <% } %>
-            <% if (Number(appointment.isRecurring) === 1) { %>
-              <p><strong>Recurring:</strong> <code><%= appointment.rrule || "Yes" %></code></p>
-            <% } %>
-            <% if (appointment.isCompleted) { %>
-              <p class="completed-label">Completed</p>
-            <% } %>
-          </div>
-          <div class="actions">
-            <a class="button glass-button button-secondary" href="/appointments/<%= appointment.id %>">View</a>
-            <a class="button glass-button button-secondary" href="/appointments/<%= appointment.id %>/edit">Edit</a>
-            <% if (Number(appointment.isRecurring) === 1) { %>
-              <form action="/api/appointments/<%= appointment.id %>/complete-occurrence" method="POST">
-                <input type="hidden" name="occurrenceKey" value="<%= appointment.occurrenceKey %>" />
-                <button class="button glass-button" type="submit">Complete Occurrence</button>
-              </form>
-            <% } else { %>
-              <form action="/appointments/<%= appointment.id %>/complete" method="POST">
-                <button class="button glass-button" type="submit">Complete</button>
-              </form>
-            <% } %>
-            <form action="/appointments/<%= appointment.id %>/delete" method="POST">
-              <button class="button glass-button button-danger" type="submit">Delete</button>
-            </form>
-          </div>
-        </article>
-      <% }) %>
-    </div>
-  <% } %>
+  </div>
+  <div class="dashboard-stats grid grid-cols-3 gap-3 w-full lg:w-auto">
+    <%- include("ui/StatTile", { label: "Today", value: todayCount }) %>
+    <%- include("ui/StatTile", { label: "This Week", value: weekCount }) %>
+    <%- include("ui/StatTile", { label: "Upcoming", value: upcomingCount }) %>
+  </div>
 </section>
 
-<section class="calendar-section glass-panel">
-  <h2>This Week</h2>
-  <% if (safeThisWeekAppointments.length === 0) { %>
-    <p class="section-empty">No appointments this week.</p>
-  <% } else { %>
-    <div class="week-list">
-      <% safeThisWeekAppointments.forEach((appointment) => { %>
-        <article class="week-row">
-          <div class="week-col week-col-title">
-            <strong><%= appointment.title %></strong>
-          </div>
-          <div class="week-col"><%= appointment.date %></div>
-          <div class="week-col"><%= to12Hour(appointment.time) %></div>
-          <div class="week-col"><%= appointment.location || "—" %></div>
-          <div class="week-col"><%= appointment.reminderMinutes !== null ? appointment.reminderMinutes + " min" : "—" %></div>
-          <div class="week-actions">
-            <a class="button glass-button button-secondary" href="/appointments/<%= appointment.id %>">View</a>
-            <a class="button glass-button button-secondary" href="/appointments/<%= appointment.id %>/edit">Edit</a>
-            <% if (Number(appointment.isRecurring) === 1) { %>
-              <form class="inline-nav-form" action="/api/appointments/<%= appointment.id %>/complete-occurrence" method="POST">
-                <input type="hidden" name="occurrenceKey" value="<%= appointment.occurrenceKey %>" />
-                <button class="button glass-button" type="submit">Complete Occurrence</button>
-              </form>
-            <% } else { %>
-              <form class="inline-nav-form" action="/appointments/<%= appointment.id %>/complete" method="POST">
-                <button class="button glass-button" type="submit">Complete</button>
-              </form>
-            <% } %>
-            <form class="inline-nav-form" action="/appointments/<%= appointment.id %>/delete" method="POST">
-              <button class="button glass-button button-danger" type="submit">Delete</button>
-            </form>
-          </div>
-        </article>
-      <% }) %>
-    </div>
-  <% } %>
-</section>
+<div class="section-divider" aria-hidden="true"></div>
 
-<section class="calendar-section glass-panel">
-  <h2>Upcoming</h2>
-  <% if (safeUpcomingAppointments.length === 0) { %>
-    <p class="section-empty">No upcoming appointments.</p>
-  <% } else { %>
-    <div class="list">
-      <% safeUpcomingAppointments.forEach((appointment) => { %>
-        <article class="card glass-card appointment-card">
-          <div class="appointment-main">
-            <h3><strong><%= appointment.title %></strong></h3>
-            <p><strong>Date:</strong> <%= appointment.date %></p>
-            <p><strong>Time:</strong> <%= to12Hour(appointment.time) %></p>
-            <% if (appointment.location) { %>
-              <p><strong>Location:</strong> <%= appointment.location %></p>
-            <% } %>
-            <% if (appointment.reminderMinutes !== null) { %>
-              <p><strong>Reminder:</strong> <%= appointment.reminderMinutes %> min before</p>
-            <% } %>
-            <% if (Number(appointment.isRecurring) === 1) { %>
-              <p><strong>Recurring:</strong> <code><%= appointment.rrule || "Yes" %></code></p>
-            <% } %>
+<section class="dashboard-grid grid grid-cols-1 lg:grid-cols-3 gap-6 mt-8">
+  <div class="dashboard-main-col lg:col-span-2 space-y-6">
+    <section class="card glass-panel quick-add-card" data-toggle-root="quick">
+      <div class="toggle-header">
+        <h2 class="toggle-title" data-toggle-title>Quick Add</h2>
+        <div class="actions">
+          <div class="tabs tabs-boxed">
+            <a class="tab tab-active" href="#quick-add" data-toggle-target="quick">Quick Add</a>
+            <a class="tab" href="#todo" data-toggle-target="todo">To-Do</a>
           </div>
-          <div class="actions">
-            <a class="button glass-button button-secondary" href="/appointments/<%= appointment.id %>">View</a>
-            <a class="button glass-button button-secondary" href="/appointments/<%= appointment.id %>/edit">Edit</a>
-            <% if (Number(appointment.isRecurring) === 1) { %>
-              <form action="/api/appointments/<%= appointment.id %>/complete-occurrence" method="POST">
-                <input type="hidden" name="occurrenceKey" value="<%= appointment.occurrenceKey %>" />
-                <button class="button glass-button" type="submit">Complete Occurrence</button>
-              </form>
-            <% } else { %>
-              <form action="/appointments/<%= appointment.id %>/complete" method="POST">
-                <button class="button glass-button" type="submit">Complete</button>
-              </form>
-            <% } %>
-            <form action="/appointments/<%= appointment.id %>/delete" method="POST">
-              <button class="button glass-button button-danger" type="submit">Delete</button>
-            </form>
-          </div>
-        </article>
-      <% }) %>
-    </div>
-  <% } %>
-</section>
+          <a class="glass-button button-secondary" href="/appointments">Open Appointments</a>
+          <a class="glass-button button-secondary" href="/appointments/new">Manual Form</a>
+        </div>
+      </div>
 
+      <div class="toggle-panel mt-4" data-toggle-panel="quick">
+        <form class="form-grid space-y-4" action="/agent/parse" method="POST" data-activity="appointment_create" data-activity-title="Created appointment draft" data-activity-field="quickText">
+          <div class="form-field">
+            <label class="text-sm text-base-content/70" for="quickText">Add appointment in plain language</label>
+            <textarea
+              id="quickText"
+              name="quickText"
+              rows="4"
+              class="agent-textarea glass-input"
+              placeholder="Dentist tomorrow 3pm remind 30&#10;Court 2/25 8:30am&#10;Job interview Friday 10am at 4900 California Ave"
+            ></textarea>
+          </div>
+          <div class="actions flex flex-wrap gap-3">
+            <button class="glass-button" type="submit">Create Draft</button>
+          </div>
+        </form>
+        <p class="quick-hint text-xs text-base-content/60 mt-3">
+          Examples: “Dentist tomorrow 3pm remind 30”, “Court 2/25 8:30am”
+        </p>
+      </div>
+
+      <div class="toggle-panel mt-4" data-toggle-panel="todo" hidden>
+        <form class="form-grid space-y-4" action="/dashboard/todo" method="POST" data-activity="todo_create" data-activity-title="Created To-Do" data-activity-field="todoTitle">
+          <div class="form-field">
+            <label class="text-sm text-base-content/70" for="todoTitle">Add a To-Do (title)</label>
+            <input
+              id="todoTitle"
+              name="todoTitle"
+              class="glass-input"
+              type="text"
+              placeholder="Call client, prep documents, follow up"
+              required
+            />
+          </div>
+          <div class="form-row">
+            <div class="form-field">
+              <label class="text-sm text-base-content/70" for="todoDate">Date (optional)</label>
+              <input id="todoDate" name="todoDate" class="glass-input" type="date" />
+            </div>
+            <div class="form-field">
+              <label class="text-sm text-base-content/70" for="todoTime">Time (optional)</label>
+              <input id="todoTime" name="todoTime" class="glass-input" type="time" />
+            </div>
+          </div>
+          <div class="form-field">
+            <label class="text-sm text-base-content/70" for="todoDuration">Duration</label>
+            <select id="todoDuration" name="todoDuration" class="glass-input">
+              <option value="15">15 minutes</option>
+              <option value="30" selected>30 minutes</option>
+              <option value="45">45 minutes</option>
+              <option value="60">60 minutes</option>
+            </select>
+            <p class="quick-hint">If no date/time is provided, we’ll schedule it for the next full hour.</p>
+          </div>
+          <div class="actions flex flex-wrap gap-3">
+            <button class="glass-button" type="submit">Add To-Do</button>
+          </div>
+        </form>
+      </div>
+    </section>
+  </div>
+
+  <aside class="dashboard-side-col lg:col-span-1 space-y-6">
+    <section class="card glass-panel">
+      <%- include("ui/SectionHeader", {
+        title: "Recent Activity",
+        subtitle: "Last 20 actions saved locally",
+        actions: ""
+      }) %>
+      <div class="recent-activity" data-activity-root>
+        <div class="skeleton-stack" data-skeleton>
+          <%- include("ui/Skeleton", { className: "skeleton-line" }) %>
+          <%- include("ui/Skeleton", { className: "skeleton-line" }) %>
+          <%- include("ui/Skeleton", { className: "skeleton-line" }) %>
+        </div>
+        <div class="recent-activity-list" data-activity-list hidden></div>
+        <div class="recent-activity-empty" data-activity-empty hidden>
+          <%- include("ui/EmptyState", {
+            title: "No activity yet",
+            message: "Create an appointment or add a To-Do to see activity here.",
+            actions: "<a class='button glass-button button-secondary' href='/appointments'>Open Appointments</a>"
+          }) %>
+        </div>
+      </div>
+    </section>
+
+    <% if (googleStatusMessage) { %>
+      <%- include("ui/Card", {
+        className: "status-card",
+        body: `<p>${googleStatusMessage}</p>`
+      }) %>
+    <% } %>
+
+    <% if (safeTestProfileActive && safeTestProfile) { %>
+      <section class="card glass-panel status-card">
+        <p>
+          <strong>Temporary Test Profile:</strong>
+          <%= safeTestProfile.name %> (<%= safeTestProfile.email %>)
+        </p>
+      </section>
+    <% } else if (!googleConfigured) { %>
+      <section class="card glass-panel status-card warning-card">
+        <p>Google Calendar OAuth is not configured yet. Add the required Google env values.</p>
+      </section>
+    <% } else if (!googleConnected) { %>
+      <section class="card glass-panel status-card warning-card">
+        <p>Google Calendar is not connected yet.</p>
+        <div class="actions mt-3">
+          <a class="glass-button" href="/auth/google" data-activity="google_connect" data-activity-title="Connected Google Calendar">Connect Google Calendar</a>
+        </div>
+      </section>
+    <% } %>
+  </aside>
+</section>
 <script src="/public/livePanelsRefresh.js"></script>
+<script src="/public/ui-activity.js"></script>
+<script src="/public/ui-error-boundary.js"></script>
+<script>
+  (() => {
+    const root = document.querySelector("[data-toggle-root]");
+    if (!root) return;
+
+    const title = root.querySelector("[data-toggle-title]");
+    const panels = Array.from(root.querySelectorAll("[data-toggle-panel]"));
+    const options = Array.from(root.querySelectorAll("[data-toggle-target]"));
+
+    const setActive = (target) => {
+      root.setAttribute("data-toggle-root", target);
+      panels.forEach((panel) => {
+        panel.hidden = panel.getAttribute("data-toggle-panel") !== target;
+      });
+      options.forEach((option) => {
+        const isActive = option.getAttribute("data-toggle-target") === target;
+        option.classList.toggle("tab-active", isActive);
+      });
+      const text = target === "todo" ? "To-Do" : "Quick Add";
+      if (title) title.textContent = text;
+    };
+
+    options.forEach((option) => {
+      option.addEventListener("click", (event) => {
+        event.preventDefault();
+        const target = option.getAttribute("data-toggle-target");
+        if (target) setActive(target);
+      });
+    });
+
+    setActive(root.getAttribute("data-toggle-root") || "quick");
+  })();
+</script>
 <%- include("partials/bottom") %>

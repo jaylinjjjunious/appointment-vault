@@ -10,6 +10,10 @@
     typeof testProfileActive !== "undefined" ? testProfileActive : false;
   const safeTestProfile =
     typeof testProfile !== "undefined" && testProfile ? testProfile : null;
+  const safeGoogleConfigured =
+    typeof googleConfigured !== "undefined" ? Boolean(googleConfigured) : false;
+  const safeGoogleConnected =
+    typeof googleConnected !== "undefined" ? Boolean(googleConnected) : false;
   const safeUser = typeof user !== "undefined" && user ? user : null;
   const safeReminderActivity =
     typeof reminderActivity !== "undefined" && reminderActivity && Array.isArray(reminderActivity.items)
@@ -20,7 +24,7 @@
   const hasSavedPrefs = String((typeof query !== "undefined" && query ? query.prefs : "") || "") === "saved";
 %>
 
-<section class="page-heading">
+<section class="page-heading settings-heading">
   <h1>Settings</h1>
   <p>Past appointments are automatically moved into History.</p>
 </section>
@@ -30,8 +34,18 @@
   </section>
 <% } %>
 
+<div data-tab-root class="settings-layout">
+  <div class="tabs tabs-boxed mt-6">
+    <a class="tab tab-active" href="#overview" data-tab="overview">Overview</a>
+    <a class="tab" href="#appointments" data-tab="appointments">Appointments</a>
+    <a class="tab" href="#checkin" data-tab="checkin">Check-In</a>
+    <a class="tab" href="#activity" data-tab="activity">Activity</a>
+    <a class="tab" href="#history" data-tab="history">History</a>
+    <a class="tab" href="#errors" data-tab="errors">Error Finder</a>
+  </div>
+
 <% if (safeTestProfileActive && safeTestProfile) { %>
-  <section class="calendar-section glass-panel">
+  <section class="calendar-section glass-panel" data-tab-panel="overview">
     <h2>Temporary Test Profile</h2>
     <p><strong>Name:</strong> <%= safeTestProfile.name %></p>
     <p><strong>Email:</strong> <%= safeTestProfile.email %></p>
@@ -39,7 +53,30 @@
   </section>
 <% } %>
 
-<section class="calendar-section glass-panel">
+<section id="overview" class="calendar-section glass-panel" data-tab-panel="overview">
+  <h2>Google Calendar</h2>
+  <% if (!safeGoogleConfigured) { %>
+    <p class="section-empty">
+      Google OAuth is not configured on this server yet.
+    </p>
+  <% } else if (safeTestProfileActive) { %>
+    <p class="section-empty">
+      Test profile mode is active and auto-connects calendar behavior.
+    </p>
+  <% } else if (safeGoogleConnected) { %>
+    <p class="section-empty">Connected. You can disconnect below.</p>
+    <form class="actions" action="/auth/google/disconnect" method="POST">
+      <button class="button glass-button button-secondary" type="submit" data-activity="google_disconnect" data-activity-title="Disconnected Google Calendar">Disconnect Google Calendar</button>
+    </form>
+  <% } else { %>
+    <p class="section-empty">Not connected yet.</p>
+    <div class="actions">
+      <a class="button glass-button" href="/auth/google" data-activity="google_connect" data-activity-title="Connected Google Calendar">Connect Google Calendar</a>
+    </div>
+  <% } %>
+</section>
+
+<section id="appointments" class="calendar-section glass-panel" data-tab-panel="appointments">
   <h2>Reminder Preferences</h2>
   <p class="section-empty">Voice first, with SMS fallback if voice fails.</p>
   <form class="form-grid" action="/settings/reminders" method="POST">
@@ -104,7 +141,7 @@
   </form>
 </section>
 
-<section class="calendar-section glass-panel">
+<section class="calendar-section glass-panel" data-tab-panel="appointments">
   <h2>Call Test</h2>
   <p class="section-empty">Use this button to place a live Twilio test call.</p>
   <form class="actions" action="/settings/test-call" method="POST">
@@ -116,34 +153,23 @@
   <% } %>
 </section>
 
-<section class="calendar-section glass-panel checkin-panel">
+<section id="checkin" class="calendar-section glass-panel" data-tab-panel="checkin">
   <h2>CE Check-In</h2>
-  <p class="section-empty">Live CE Check-In portal loaded inside this panel.</p>
+  <p class="section-empty">Use the Calendar page for the embedded Check-In portal.</p>
   <div class="actions">
+    <a class="button glass-button button-secondary" href="/calendar#checkin">Open Check-In Panel</a>
     <a
       class="button glass-button button-secondary"
-      href="https://cecheckin.com"
+      href="https://www.cecheckin.com/client/account/signin"
       target="_blank"
       rel="noopener noreferrer"
     >
-      Open CE Check-In In New Tab
+      Open In New Tab
     </a>
   </div>
-  <div class="checkin-embed-wrap">
-    <iframe
-      class="checkin-embed"
-      src="https://cecheckin.com"
-      title="CE Check-In Website"
-      loading="eager"
-      referrerpolicy="no-referrer-when-downgrade"
-    ></iframe>
-  </div>
-  <p class="section-empty">
-    If the site blocks embedding, use the open-in-new-tab button above.
-  </p>
 </section>
 
-<section class="calendar-section glass-panel">
+<section id="activity" class="calendar-section glass-panel" data-tab-panel="activity">
   <h2>Reminder Activity</h2>
   <p class="section-empty">Latest delivery attempts, retries, and fallbacks.</p>
   <form class="form-row" action="/settings" method="GET">
@@ -195,7 +221,7 @@
   <% } %>
 </section>
 
-<section class="calendar-section glass-panel">
+<section id="history" class="calendar-section glass-panel" data-tab-panel="history">
   <h2>History</h2>
   <p class="section-empty">
     Click below to open your full history log.
@@ -214,6 +240,16 @@
     <a class="button glass-button button-secondary" href="/settings/history">Open History Page</a>
   </noscript>
   <p class="section-empty">If popup does not open, use <a href="/settings/history">History Page</a>.</p>
+</section>
+
+<section id="errors" class="calendar-section glass-panel" data-tab-panel="errors">
+  <h2>Error Finder</h2>
+  <p class="section-empty">Shows the most recent error report copied from the Server Error page.</p>
+  <pre class="error-report__box" id="settingsErrorReport">No error report saved yet.</pre>
+  <div class="actions">
+    <button class="button glass-button button-secondary" type="button" id="copySavedError">Copy Saved Report</button>
+    <button class="button glass-button button-secondary" type="button" id="clearSavedError">Clear Saved Report</button>
+  </div>
 </section>
 
 <div id="historyModal" class="history-modal-backdrop" hidden aria-hidden="true">
@@ -261,6 +297,100 @@
     <% } %>
   </section>
 </div>
+
+</div>
+
+<script>
+  (() => {
+    const root = document.querySelector("[data-tab-root]");
+    if (!root) return;
+
+    const tabs = Array.from(root.querySelectorAll("[data-tab]"));
+    const panels = Array.from(root.querySelectorAll("[data-tab-panel]"));
+
+    const activate = (key) => {
+      panels.forEach((panel) => {
+        panel.hidden = panel.getAttribute("data-tab-panel") !== key;
+      });
+      tabs.forEach((tab) => {
+        const isActive = tab.getAttribute("data-tab") === key;
+        tab.classList.toggle("tab-active", isActive);
+      });
+    };
+
+    const hash = window.location.hash.replace("#", "");
+    const normalized = hash === "reminders" ? "appointments" : hash;
+    const initial = tabs.some((tab) => tab.getAttribute("data-tab") === normalized)
+      ? normalized
+      : "overview";
+    activate(initial);
+
+    tabs.forEach((tab) => {
+      tab.addEventListener("click", (event) => {
+        const key = tab.getAttribute("data-tab");
+        if (!key) return;
+        event.preventDefault();
+        history.replaceState(null, "", `#${key}`);
+        activate(key);
+      });
+    });
+  })();
+</script>
+
+<script>
+  (() => {
+    const reportEl = document.getElementById("settingsErrorReport");
+    const copyBtn = document.getElementById("copySavedError");
+    const clearBtn = document.getElementById("clearSavedError");
+    if (!reportEl) return;
+
+    const loadReport = () => {
+      let payload = "";
+      try {
+        payload = localStorage.getItem("av:lastErrorReport") || "";
+      } catch (error) {
+        payload = "";
+      }
+      reportEl.textContent = payload || "No error report saved yet.";
+      if (copyBtn) {
+        copyBtn.disabled = !payload;
+      }
+      if (clearBtn) {
+        clearBtn.disabled = !payload;
+      }
+    };
+
+    loadReport();
+
+    if (copyBtn) {
+      copyBtn.addEventListener("click", async () => {
+        const payload = reportEl.textContent || "";
+        if (!payload || payload.startsWith("No error report")) return;
+        try {
+          await navigator.clipboard.writeText(payload);
+          copyBtn.textContent = "Copied!";
+          setTimeout(() => {
+            copyBtn.textContent = "Copy Saved Report";
+          }, 1200);
+        } catch (error) {
+          copyBtn.textContent = "Copy failed";
+        }
+      });
+    }
+
+    if (clearBtn) {
+      clearBtn.addEventListener("click", () => {
+        try {
+          localStorage.removeItem("av:lastErrorReport");
+          localStorage.removeItem("av:lastErrorTime");
+        } catch (error) {
+          // ignore localStorage failures
+        }
+        loadReport();
+      });
+    }
+  })();
+</script>
 
 <script>
   (() => {

@@ -1,0 +1,199 @@
+<%
+  const to12Hour =
+    typeof formatDisplayTime === "function"
+      ? formatDisplayTime
+      : (timeValue) => String(timeValue ?? "");
+  const safeTodayAppointments =
+    typeof todayAppointments !== "undefined" && Array.isArray(todayAppointments)
+      ? todayAppointments
+      : [];
+  const safeThisWeekAppointments =
+    typeof thisWeekAppointments !== "undefined" && Array.isArray(thisWeekAppointments)
+      ? thisWeekAppointments
+      : [];
+  const safeUpcomingAppointments =
+    typeof upcomingAppointments !== "undefined" && Array.isArray(upcomingAppointments)
+      ? upcomingAppointments
+      : [];
+%>
+
+<section id="today" class="calendar-section glass-panel today-section">
+  <h2>Today</h2>
+  <% if (safeTodayAppointments.length === 0) { %>
+    <p class="section-empty">No appointments today.</p>
+  <% } else { %>
+    <div class="list">
+      <% safeTodayAppointments.forEach((appointment) => { %>
+        <article id="appointment-<%= appointment.id %>" class="card glass-card appointment-card <%= appointment.isCompleted ? 'completed-card' : '' %>">
+          <div class="appointment-main">
+            <h3><strong><%= appointment.title %></strong></h3>
+            <% if (appointment.isExternalGoogle) { %>
+              <p><span class="tag">Google event</span></p>
+            <% } %>
+            <p><strong>Date:</strong> <%= appointment.date %></p>
+            <p><strong>Time:</strong> <%= to12Hour(appointment.time) %></p>
+            <% if (appointment.location) { %>
+              <p><strong>Location:</strong> <%= appointment.location %></p>
+            <% } %>
+            <% if (appointment.reminderMinutes !== null) { %>
+              <p><strong>Reminder:</strong> <%= appointment.reminderMinutes %> min before</p>
+            <% } %>
+            <% if (Number(appointment.isRecurring) === 1) { %>
+              <p><strong>Recurring:</strong> <code><%= appointment.rrule || "Yes" %></code></p>
+            <% } %>
+            <% if (appointment.isCompleted) { %>
+              <p class="completed-label">Completed</p>
+            <% } %>
+          </div>
+          <div class="actions">
+            <% if (appointment.isExternalGoogle) { %>
+              <a class="button glass-button button-secondary" href="/calendar">Open in Calendar</a>
+            <% } else { %>
+              <a class="button glass-button button-secondary" href="/appointments/<%= appointment.id %>">View</a>
+              <a class="button glass-button button-secondary" href="/appointments/<%= appointment.id %>/edit">Edit</a>
+              <% if (Number(appointment.isRecurring) === 1) { %>
+                <form action="/api/appointments/<%= appointment.id %>/complete-occurrence" method="POST">
+                  <input type="hidden" name="occurrenceKey" value="<%= appointment.occurrenceKey %>" />
+                  <button class="button glass-button" type="submit">Complete Occurrence</button>
+                </form>
+              <% } else { %>
+                <form action="/appointments/<%= appointment.id %>/complete" method="POST">
+                  <button class="button glass-button" type="submit">Complete</button>
+                </form>
+              <% } %>
+              <form
+                action="/appointments/<%= appointment.id %>/delete"
+                method="POST"
+                hx-post="/appointments/<%= appointment.id %>/delete?partial=1"
+                hx-target="#appointment-<%= appointment.id %>"
+                hx-swap="delete"
+                hx-confirm="Delete this appointment?"
+                data-activity="appointment_delete"
+                data-activity-title="Deleted appointment"
+                data-activity-detail="<%= appointment.title %>"
+              >
+                <button class="button glass-button button-danger" type="submit">Delete</button>
+              </form>
+            <% } %>
+          </div>
+        </article>
+      <% }) %>
+    </div>
+  <% } %>
+</section>
+
+<section id="this-week" class="calendar-section glass-panel">
+  <h2>This Week</h2>
+  <% if (safeThisWeekAppointments.length === 0) { %>
+    <p class="section-empty">No appointments this week.</p>
+  <% } else { %>
+    <div class="week-list">
+      <% safeThisWeekAppointments.forEach((appointment) => { %>
+        <article id="appointment-<%= appointment.id %>-week" class="week-row">
+          <div class="week-col week-col-title">
+            <strong><%= appointment.title %></strong>
+            <% if (appointment.isExternalGoogle) { %> <span class="tag">Google</span><% } %>
+          </div>
+          <div class="week-col"><%= appointment.date %></div>
+          <div class="week-col"><%= to12Hour(appointment.time) %></div>
+          <div class="week-col"><%= appointment.location || "—" %></div>
+          <div class="week-col"><%= appointment.reminderMinutes !== null ? appointment.reminderMinutes + " min" : "—" %></div>
+          <div class="week-actions">
+            <% if (appointment.isExternalGoogle) { %>
+              <a class="button glass-button button-secondary" href="/calendar">Open in Calendar</a>
+            <% } else { %>
+              <a class="button glass-button button-secondary" href="/appointments/<%= appointment.id %>">View</a>
+              <a class="button glass-button button-secondary" href="/appointments/<%= appointment.id %>/edit">Edit</a>
+              <% if (Number(appointment.isRecurring) === 1) { %>
+                <form class="inline-nav-form" action="/api/appointments/<%= appointment.id %>/complete-occurrence" method="POST">
+                  <input type="hidden" name="occurrenceKey" value="<%= appointment.occurrenceKey %>" />
+                  <button class="button glass-button" type="submit">Complete Occurrence</button>
+                </form>
+              <% } else { %>
+                <form class="inline-nav-form" action="/appointments/<%= appointment.id %>/complete" method="POST">
+                  <button class="button glass-button" type="submit">Complete</button>
+                </form>
+              <% } %>
+              <form
+                class="inline-nav-form"
+                action="/appointments/<%= appointment.id %>/delete"
+                method="POST"
+                hx-post="/appointments/<%= appointment.id %>/delete?partial=1"
+                hx-target="#appointment-<%= appointment.id %>-week"
+                hx-swap="delete"
+                hx-confirm="Delete this appointment?"
+                data-activity="appointment_delete"
+                data-activity-title="Deleted appointment"
+                data-activity-detail="<%= appointment.title %>"
+              >
+                <button class="button glass-button button-danger" type="submit">Delete</button>
+              </form>
+            <% } %>
+          </div>
+        </article>
+      <% }) %>
+    </div>
+  <% } %>
+</section>
+
+<section id="upcoming" class="calendar-section glass-panel">
+  <h2>Upcoming</h2>
+  <% if (safeUpcomingAppointments.length === 0) { %>
+    <p class="section-empty">No upcoming appointments.</p>
+  <% } else { %>
+    <div class="list">
+      <% safeUpcomingAppointments.forEach((appointment) => { %>
+        <article id="appointment-<%= appointment.id %>-upcoming" class="card glass-card appointment-card">
+          <div class="appointment-main">
+            <h3><strong><%= appointment.title %></strong></h3>
+            <% if (appointment.isExternalGoogle) { %>
+              <p><span class="tag">Google event</span></p>
+            <% } %>
+            <p><strong>Date:</strong> <%= appointment.date %></p>
+            <p><strong>Time:</strong> <%= to12Hour(appointment.time) %></p>
+            <% if (appointment.location) { %>
+              <p><strong>Location:</strong> <%= appointment.location %></p>
+            <% } %>
+            <% if (appointment.reminderMinutes !== null) { %>
+              <p><strong>Reminder:</strong> <%= appointment.reminderMinutes %> min before</p>
+            <% } %>
+            <% if (Number(appointment.isRecurring) === 1) { %>
+              <p><strong>Recurring:</strong> <code><%= appointment.rrule || "Yes" %></code></p>
+            <% } %>
+          </div>
+          <div class="actions">
+            <% if (appointment.isExternalGoogle) { %>
+              <a class="button glass-button button-secondary" href="/calendar">Open in Calendar</a>
+            <% } else { %>
+              <a class="button glass-button button-secondary" href="/appointments/<%= appointment.id %>">View</a>
+              <a class="button glass-button button-secondary" href="/appointments/<%= appointment.id %>/edit">Edit</a>
+              <% if (Number(appointment.isRecurring) === 1) { %>
+                <form action="/api/appointments/<%= appointment.id %>/complete-occurrence" method="POST">
+                  <input type="hidden" name="occurrenceKey" value="<%= appointment.occurrenceKey %>" />
+                  <button class="button glass-button" type="submit">Complete Occurrence</button>
+                </form>
+              <% } else { %>
+                <form action="/appointments/<%= appointment.id %>/complete" method="POST">
+                  <button class="button glass-button" type="submit">Complete</button>
+                </form>
+              <% } %>
+              <form
+                action="/appointments/<%= appointment.id %>/delete"
+                method="POST"
+                hx-post="/appointments/<%= appointment.id %>/delete?partial=1"
+                hx-target="#appointment-<%= appointment.id %>-upcoming"
+                hx-swap="delete"
+                hx-confirm="Delete this appointment?"
+                data-activity="appointment_delete"
+                data-activity-title="Deleted appointment"
+                data-activity-detail="<%= appointment.title %>"
+              >
+                <button class="button glass-button button-danger" type="submit">Delete</button>
+              </form>
+            <% } %>
+          </div>
+        </article>
+      <% }) %>
+    </div>
+  <% } %>
+</section>

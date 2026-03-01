@@ -3,7 +3,41 @@
 <section class="card glass-panel empty-state">
   <h1>Server Error</h1>
   <p><%= message %></p>
-  <a class="button glass-button" href="/">Back to Home</a>
+  <div class="error-report">
+    <h2>Report Details</h2>
+    <p><strong>Request ID:</strong> <span id="errorRequestId"><%= requestId || "Unavailable" %></span></p>
+    <p><strong>Status:</strong> <%= errorReport?.status || 500 %></p>
+    <p><strong>Path:</strong> <%= method %> <%= path %></p>
+    <p><strong>Time:</strong> <span id="errorTime"><%= serverTime || "" %></span></p>
+    <pre class="error-report__box" id="errorReportPayload"><%= errorReportText || "" %></pre>
+    <button class="button glass-button button-secondary" type="button" id="copyErrorReport">Copy Error Report</button>
+  </div>
+  <a class="button glass-button" href="/calendar">Back to Home</a>
 </section>
+
+<script>
+  (() => {
+    const copyBtn = document.getElementById("copyErrorReport");
+    if (!copyBtn) return;
+    copyBtn.addEventListener("click", async () => {
+      const payload = document.getElementById("errorReportPayload")?.textContent || "";
+      try {
+        await navigator.clipboard.writeText(payload);
+        try {
+          localStorage.setItem("av:lastErrorReport", payload);
+          localStorage.setItem("av:lastErrorTime", new Date().toISOString());
+        } catch (storageError) {
+          // ignore localStorage failures
+        }
+        copyBtn.textContent = "Copied!";
+        setTimeout(() => {
+          copyBtn.textContent = "Copy Error Report";
+        }, 1200);
+      } catch (error) {
+        copyBtn.textContent = "Copy failed";
+      }
+    });
+  })();
+</script>
 
 <%- include("partials/bottom") %>

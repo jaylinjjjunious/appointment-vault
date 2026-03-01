@@ -1,0 +1,241 @@
+<%- include("../partials/top", { title }) %>
+<%
+  const safeFilters = typeof filters === "object" && filters ? filters : { title: "", dateFrom: "", dateTo: "" };
+  const todoMessage = typeof todoStatusMessage === "string" ? todoStatusMessage : "";
+  const safeTodoItems = Array.isArray(todoItems) ? todoItems : [];
+%>
+
+<section class="page-heading">
+  <h1>Appointments</h1>
+  <p>Manage your schedule, search, and To-Dos in one place.</p>
+</section>
+
+<section class="card glass-panel">
+  <div class="page-actions">
+    <a class="button glass-button" href="/appointments/new" data-activity="appointment_create" data-activity-title="Started new appointment">New Appointment</a>
+    <a class="button glass-button button-secondary" href="/appointments#quick-add">Quick Add</a>
+    <a class="button glass-button button-secondary" href="/calendar">Open Calendar</a>
+  </div>
+
+  <div data-tab-root>
+    <div class="tabs tabs-boxed">
+      <a class="tab tab-active" href="#quick-add" data-tab="quick-add">Quick Add</a>
+      <a class="tab" href="#todo" data-tab="todo">To-Do</a>
+      <a class="tab" href="#list" data-tab="list">List</a>
+      <a class="tab" href="#search" data-tab="search">Search</a>
+    </div>
+
+    <% if (todoMessage) { %>
+      <section class="card glass-panel status-card" style="margin-top: 1rem;">
+        <p><%= todoMessage %></p>
+      </section>
+    <% } %>
+
+    <section data-tab-panel="list" hidden style="margin-top: 1rem;">
+      <nav class="section-nav" aria-label="Appointment sections">
+        <span class="section-nav__label">Jump to:</span>
+        <a class="section-nav__link" href="#today">Today</a>
+        <a class="section-nav__link" href="#this-week">This Week</a>
+        <a class="section-nav__link" href="#upcoming">Upcoming</a>
+      </nav>
+
+      <div class="skeleton-stack" data-skeleton>
+        <%- include("../ui/Skeleton", { className: "skeleton-line" }) %>
+        <%- include("../ui/Skeleton", { className: "skeleton-line" }) %>
+        <%- include("../ui/Skeleton", { className: "skeleton-line" }) %>
+      </div>
+
+      <div id="appointments-sections">
+        <%- include("../partials/appointments-sections", {
+          todayAppointments,
+          thisWeekAppointments,
+          upcomingAppointments
+        }) %>
+      </div>
+    </section>
+
+    <section data-tab-panel="search" hidden style="margin-top: 1rem;">
+      <form
+        class="form-grid"
+        action="/appointments"
+        method="GET"
+        hx-get="/partials/appointments-sections"
+        hx-target="#appointments-sections"
+        hx-push-url="true"
+        hx-indicator="#appointments-loading"
+        data-filter-form
+      >
+        <div class="form-row">
+          <div class="form-field">
+            <label for="titleFilter">Title contains</label>
+            <input id="titleFilter" class="glass-input" name="title" type="text" value="<%= safeFilters.title || '' %>" />
+          </div>
+          <div class="form-field">
+            <label for="dateFromFilter">From date</label>
+            <input id="dateFromFilter" class="glass-input" name="dateFrom" type="date" value="<%= safeFilters.dateFrom || '' %>" />
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-field">
+            <label for="dateToFilter">To date</label>
+            <input id="dateToFilter" class="glass-input" name="dateTo" type="date" value="<%= safeFilters.dateTo || '' %>" />
+          </div>
+          <div class="actions">
+            <button class="button glass-button button-secondary" type="submit">Apply</button>
+            <a class="button glass-button button-secondary" href="/appointments">Reset</a>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-field">
+            <label for="filterName">Save filter as</label>
+            <input id="filterName" class="glass-input" name="filterName" type="text" placeholder="e.g., This Week" data-filter-name />
+          </div>
+          <div class="actions">
+            <button class="button glass-button button-secondary" type="button" data-save-filter>Save Filter</button>
+          </div>
+        </div>
+        <p id="appointments-loading" class="section-empty htmx-indicator">Refreshing appointments…</p>
+      </form>
+      <p class="section-empty">Results update in the List tab.</p>
+
+      <div class="saved-filters" data-saved-filters>
+        <h3>Saved Filters</h3>
+        <div data-saved-filters-list class="saved-filters-list"></div>
+        <div data-saved-filters-empty>
+          <%- include("../ui/EmptyState", {
+            title: "No saved filters",
+            message: "Save a filter to quickly apply it later.",
+            actions: ""
+          }) %>
+        </div>
+      </div>
+    </section>
+
+    <section data-tab-panel="todo" hidden style="margin-top: 1rem;">
+      <form class="form-grid" action="/dashboard/todo" method="POST" data-activity="todo_create" data-activity-title="Created To-Do" data-activity-field="todoTitle">
+        <div class="form-field">
+          <label for="todoTitle">Add a To-Do (title)</label>
+          <input
+            id="todoTitle"
+            name="todoTitle"
+            class="glass-input"
+            type="text"
+            placeholder="Call client, prep documents, follow up"
+            required
+          />
+        </div>
+        <div class="form-row">
+          <div class="form-field">
+            <label for="todoDate">Date (optional)</label>
+            <input id="todoDate" name="todoDate" class="glass-input" type="date" />
+          </div>
+          <div class="form-field">
+            <label for="todoTime">Time (optional)</label>
+            <input id="todoTime" name="todoTime" class="glass-input" type="time" />
+          </div>
+        </div>
+        <div class="form-field">
+          <label for="todoDuration">Duration</label>
+          <select id="todoDuration" name="todoDuration" class="glass-input">
+            <option value="15">15 minutes</option>
+            <option value="30" selected>30 minutes</option>
+            <option value="45">45 minutes</option>
+            <option value="60">60 minutes</option>
+          </select>
+          <p class="quick-hint">If no date/time is provided, we’ll schedule it for the next full hour.</p>
+        </div>
+        <div class="actions">
+          <button class="button glass-button" type="submit">Add To-Do</button>
+        </div>
+      </form>
+
+      <div class="todo-list">
+        <h3>Upcoming To-Dos</h3>
+        <% if (!googleConnected) { %>
+          <p class="section-empty">Connect Google Calendar to view To-Dos.</p>
+        <% } else if (safeTodoItems.length === 0) { %>
+          <p class="section-empty">No upcoming To-Dos yet.</p>
+        <% } else { %>
+          <ul class="list">
+            <% safeTodoItems.forEach((item) => { %>
+              <li class="card glass-card appointment-card">
+                <div class="appointment-main">
+                  <h3><strong><%= item.title %></strong></h3>
+                  <% if (item.start) { %>
+                    <p><strong>When:</strong> <%= item.start %></p>
+                  <% } %>
+                </div>
+                <div class="actions">
+                  <form action="/dashboard/todo/complete" method="POST" class="todo-complete-form">
+                    <input type="hidden" name="todoEventId" value="<%= item.id || '' %>" />
+                    <input type="hidden" name="todoSyncId" value="<%= item.syncId || '' %>" />
+                    <label class="todo-check">
+                      <input type="checkbox" class="todo-check-input" onchange="this.form.submit()" />
+                      <span>Complete</span>
+                    </label>
+                  </form>
+                </div>
+              </li>
+            <% }) %>
+          </ul>
+        <% } %>
+      </div>
+    </section>
+
+    <section data-tab-panel="quick-add" style="margin-top: 1rem;">
+      <form class="form-grid space-y-4" action="/agent/parse" method="POST" data-activity="appointment_create" data-activity-title="Created appointment draft" data-activity-field="quickText">
+        <div class="form-field">
+          <label class="text-sm text-base-content/70" for="quickText">Add appointment in plain language</label>
+          <textarea
+            id="quickText"
+            name="quickText"
+            rows="4"
+            class="agent-textarea glass-input"
+            placeholder="Dentist tomorrow 3pm remind 30&#10;Court 2/25 8:30am&#10;Job interview Friday 10am at 4900 California Ave"
+          ></textarea>
+        </div>
+        <div class="actions flex flex-wrap gap-3">
+          <button class="glass-button" type="submit">Create Draft</button>
+          <a class="glass-button button-secondary" href="/appointments/new">Manual Form</a>
+        </div>
+      </form>
+      <p class="quick-hint text-xs text-base-content/60 mt-3">
+        Examples: “Dentist tomorrow 3pm remind 30”, “Court 2/25 8:30am”
+      </p>
+    </section>
+  </div>
+</section>
+
+<script>
+  (() => {
+    const root = document.querySelector("[data-tab-root]");
+    if (!root) return;
+    const tabs = Array.from(root.querySelectorAll("[data-tab]"));
+    const panels = Array.from(root.querySelectorAll("[data-tab-panel]"));
+    const activate = (key) => {
+      panels.forEach((panel) => {
+        panel.hidden = panel.getAttribute("data-tab-panel") !== key;
+      });
+      tabs.forEach((tab) => {
+        const isActive = tab.getAttribute("data-tab") === key;
+        tab.classList.toggle("tab-active", isActive);
+      });
+    };
+    const hash = window.location.hash.replace("#", "");
+    const initial = tabs.some((tab) => tab.getAttribute("data-tab") === hash) ? hash : "quick-add";
+    activate(initial);
+    tabs.forEach((tab) => {
+      tab.addEventListener("click", (event) => {
+        const key = tab.getAttribute("data-tab");
+        if (!key) return;
+        event.preventDefault();
+        history.replaceState(null, "", `#${key}`);
+        activate(key);
+      });
+    });
+  })();
+</script>
+
+<script src="/public/livePanelsRefresh.js"></script>
+<script src="/public/ui-filters.js"></script>
+<%- include("../partials/bottom") %>

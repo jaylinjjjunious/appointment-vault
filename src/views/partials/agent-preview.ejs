@@ -1,0 +1,27 @@
+<%
+  const to12Hour =
+    typeof formatDisplayTime === "function"
+      ? formatDisplayTime
+      : (timeValue) => String(timeValue ?? "");
+  const safeParsed = parsed && typeof parsed === "object" ? parsed : null;
+%>
+<section class="card glass-panel">
+  <h2 class="text-lg font-semibold">Live Preview</h2>
+  <% if (!safeParsed) { %>
+    <p class="section-empty text-sm text-base-content/60">Start typing above to preview extracted fields.</p>
+  <% } else { %>
+    <div class="preview-grid mt-4 grid grid-cols-1 gap-2 text-sm">
+      <p><strong>Title:</strong> <%= safeParsed.title || "Not set" %></p>
+      <p><strong>Date:</strong> <%= safeParsed.date || "Not set" %></p>
+      <p><strong>Time:</strong> <%= safeParsed.time ? to12Hour(safeParsed.time) : "Not set" %></p>
+      <p><strong>Location:</strong> <%= safeParsed.location || "None" %></p>
+      <p><strong>Reminder:</strong> <%= safeParsed.reminderMinutes === "" ? "None" : safeParsed.reminderMinutes + " min" %></p>
+      <p><strong>Recurring:</strong> <%= safeParsed.isRecurring ? "Yes" : "No" %></p>
+      <p><strong>Tags:</strong> <%= safeParsed.tags || "None" %></p>
+      <p class="preview-notes"><strong>Notes:</strong> <%= safeParsed.notes || "None" %></p>
+    </div>
+  <% } %>
+  <% if (previewError) { %>
+    <p class="error-text"><%= previewError %></p>
+  <% } %>
+</section>

@@ -1,0 +1,118 @@
+openapi: 3.1.0
+info:
+  title: Appointment Vault API
+  version: 2.0.0
+  description: JSON API for auth and appointments.
+servers:
+  - url: /api
+paths:
+  /auth/me:
+    get:
+      summary: Get current authenticated user
+      responses:
+        '200':
+          description: Current user
+  /appointments:
+    get:
+      summary: List appointments
+      parameters:
+        - in: query
+          name: title
+          schema:
+            type: string
+        - in: query
+          name: dateFrom
+          schema:
+            type: string
+        - in: query
+          name: dateTo
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Appointment list
+    post:
+      summary: Create appointment
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [title, date, time]
+              properties:
+                title:
+                  type: string
+                date:
+                  type: string
+                time:
+                  type: string
+                location:
+                  type: string
+                notes:
+                  type: string
+                tags:
+                  type: string
+                reminderMinutes:
+                  type: integer
+      responses:
+        '201':
+          description: Created
+  /appointments/{id}:
+    get:
+      summary: Get appointment by id
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Appointment
+    put:
+      summary: Update appointment
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Updated
+    delete:
+      summary: Delete appointment
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Deleted
+  /appointments/{id}.ics:
+    get:
+      summary: Export appointment as ICS
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: iCalendar file
+  /admin/users:
+    get:
+      summary: List users (admin only)
+      responses:
+        '200':
+          description: Users list
+  /reminders/test-email:
+    post:
+      summary: Send test reminder email
+      responses:
+        '200':
+          description: Email sent

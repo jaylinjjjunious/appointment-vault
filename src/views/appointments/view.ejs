@@ -24,6 +24,10 @@
 </section>
 
 <article class="card glass-panel detail-card">
+  <div class="page-actions">
+    <a class="button glass-button button-secondary" href="/appointments">Back to Appointments</a>
+    <a class="button glass-button button-secondary" href="/appointments/<%= appointment.id %>/edit">Edit Appointment</a>
+  </div>
   <p><strong>Date:</strong> <%= appointment.date %></p>
   <p><strong>Time:</strong> <%= to12Hour(appointment.time) %></p>
   <p><strong>Location:</strong> <%= appointment.location || "Not provided" %></p>
@@ -54,7 +58,7 @@
   </div>
 
   <div class="actions">
-    <a class="button glass-button button-secondary" href="/">Back to List</a>
+    <a class="button glass-button button-secondary" href="/dashboard">Back to List</a>
     <a class="button glass-button button-secondary" href="/appointments/<%= appointment.id %>/edit">Edit</a>
     <% if (!appointment.isHistory) { %>
       <% if (Number(appointment.isRecurring) === 1) { %>
@@ -71,7 +75,13 @@
         </form>
       <% } %>
     <% } %>
-    <form action="/appointments/<%= appointment.id %>/delete" method="POST">
+    <form
+      action="/appointments/<%= appointment.id %>/delete"
+      method="POST"
+      data-activity="appointment_delete"
+      data-activity-title="Deleted appointment"
+      data-activity-detail="<%= appointment.title %>"
+    >
       <button class="button glass-button button-danger" type="submit">Delete</button>
     </form>
   </div>

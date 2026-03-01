@@ -20,6 +20,11 @@ db.exec(`
     providerUserId TEXT NOT NULL,
     email TEXT,
     displayName TEXT,
+    passwordHash TEXT,
+    role TEXT NOT NULL DEFAULT 'user',
+    emailVerifiedAt TEXT,
+    lastLoginAt TEXT,
+    isActive INTEGER NOT NULL DEFAULT 1,
     phoneNumber TEXT,
     timezone TEXT NOT NULL DEFAULT 'America/Los_Angeles',
     voiceEnabled INTEGER NOT NULL DEFAULT 1,
@@ -35,6 +40,12 @@ db.exec(`
 db.exec(`
   CREATE UNIQUE INDEX IF NOT EXISTS idx_users_provider_uid
   ON users (provider, providerUserId)
+`);
+
+db.exec(`
+  CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email_unique
+  ON users (email)
+  WHERE email IS NOT NULL
 `);
 
 db.exec(`
@@ -96,6 +107,31 @@ if (!columnNames.includes("occurrenceStart")) {
 
 if (!columnNames.includes("occurrenceEnd")) {
   db.exec("ALTER TABLE appointments ADD COLUMN occurrenceEnd TEXT");
+}
+
+const userColumnNames = db
+  .prepare("PRAGMA table_info(users)")
+  .all()
+  .map((column) => column.name);
+
+if (!userColumnNames.includes("passwordHash")) {
+  db.exec("ALTER TABLE users ADD COLUMN passwordHash TEXT");
+}
+
+if (!userColumnNames.includes("role")) {
+  db.exec("ALTER TABLE users ADD COLUMN role TEXT NOT NULL DEFAULT 'user'");
+}
+
+if (!userColumnNames.includes("emailVerifiedAt")) {
+  db.exec("ALTER TABLE users ADD COLUMN emailVerifiedAt TEXT");
+}
+
+if (!userColumnNames.includes("lastLoginAt")) {
+  db.exec("ALTER TABLE users ADD COLUMN lastLoginAt TEXT");
+}
+
+if (!userColumnNames.includes("isActive")) {
+  db.exec("ALTER TABLE users ADD COLUMN isActive INTEGER NOT NULL DEFAULT 1");
 }
 
 db.exec(`
@@ -188,6 +224,26 @@ db.exec(`
     value TEXT NOT NULL,
     updatedAt TEXT NOT NULL
   )
+`);
+
+db.exec(`
+  CREATE TABLE IF NOT EXISTS checkin_documents (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    userId INTEGER NOT NULL,
+    title TEXT,
+    description TEXT,
+    fileName TEXT NOT NULL,
+    mimeType TEXT NOT NULL,
+    sizeBytes INTEGER NOT NULL,
+    fileData BLOB NOT NULL,
+    createdAt TEXT NOT NULL,
+    FOREIGN KEY (userId) REFERENCES users(id)
+  )
+`);
+
+db.exec(`
+  CREATE INDEX IF NOT EXISTS idx_checkin_documents_user
+  ON checkin_documents (userId, createdAt DESC)
 `);
 
 module.exports = db;

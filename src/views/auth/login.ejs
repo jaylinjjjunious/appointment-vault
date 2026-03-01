@@ -1,0 +1,30 @@
+<%- include("../partials/top", { title }) %>
+
+<section class="page-heading">
+  <h1>Sign In</h1>
+  <p>Access your Appointment Vault account.</p>
+</section>
+
+<section class="card glass-panel auth-card">
+  <% if (error) { %>
+    <p class="error-text"><%= error %></p>
+  <% } %>
+  <form class="form-grid" action="/auth/login" method="POST">
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>" />
+    <div class="form-field">
+      <label for="email">Email</label>
+      <input id="email" class="glass-input" name="email" type="email" value="<%= values.email || '' %>" required />
+    </div>
+    <div class="form-field">
+      <label for="password">Password</label>
+      <input id="password" class="glass-input" name="password" type="password" required />
+    </div>
+    <div class="actions">
+      <button class="button glass-button" type="submit">Sign In</button>
+      <a class="button glass-button button-secondary" href="/auth/register">Create Account</a>
+      <a class="button glass-button button-secondary" href="/auth/google">Sign In with Google</a>
+    </div>
+  </form>
+</section>
+
+<%- include("../partials/bottom") %>

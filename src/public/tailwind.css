@@ -1,0 +1,186 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    color-scheme: dark;
+    --radius-card: 22px;
+    --radius-control: 16px;
+    --radius-pill: 999px;
+    --surface-1: rgba(21, 18, 20, 0.88);
+    --surface-2: rgba(26, 21, 22, 0.92);
+    --surface-border: rgba(255, 180, 120, 0.08);
+    --text-primary: #f2f2f2;
+    --text-secondary: #b7b7b7;
+    --accent: #f5a623;
+    --accent-hover: #ffb347;
+  }
+
+  html {
+    font-family: "Inter", ui-sans-serif, system-ui;
+  }
+
+  body {
+    @apply min-h-screen bg-base-100 text-base-content antialiased;
+    background-image: theme("backgroundImage.vault-grid");
+    color: var(--text-primary);
+  }
+
+  h1,
+  h2,
+  h3 {
+    font-family: "Space Grotesk", ui-sans-serif, system-ui;
+  }
+
+  h1 {
+    @apply text-3xl font-bold tracking-tight;
+  }
+
+  h2 {
+    @apply text-xl font-semibold tracking-tight;
+  }
+
+  p {
+    color: var(--text-secondary);
+  }
+}
+
+@layer components {
+  .glass-surface {
+    background: var(--surface-1);
+    border: 1px solid var(--surface-border);
+    box-shadow:
+      0 12px 40px rgba(0, 0, 0, 0.55),
+      inset 0 1px 0 rgba(255, 180, 120, 0.06);
+    backdrop-filter: blur(12px);
+  }
+
+  .glass-panel {
+    @apply p-6;
+    background: var(--surface-1);
+    border: 1px solid var(--surface-border);
+    box-shadow:
+      0 12px 40px rgba(0, 0, 0, 0.55),
+      inset 0 1px 0 rgba(255, 180, 120, 0.06);
+    backdrop-filter: blur(12px);
+    border-radius: var(--radius-card);
+  }
+
+  .glass-card {
+    @apply p-5;
+    background: var(--surface-1);
+    border: 1px solid var(--surface-border);
+    box-shadow:
+      0 12px 40px rgba(0, 0, 0, 0.55),
+      inset 0 1px 0 rgba(255, 180, 120, 0.06);
+    backdrop-filter: blur(12px);
+    border-radius: calc(var(--radius-card) - 4px);
+    transition: transform 200ms ease, box-shadow 200ms ease;
+  }
+
+  .glass-card:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 18px 60px rgba(0, 0, 0, 0.65);
+  }
+
+  .glass-input {
+    @apply input w-full bg-base-200/40 border border-base-300/60 focus:outline-none focus:ring-2 focus:ring-primary/40;
+    border-radius: var(--radius-control);
+    color: var(--text-primary);
+    transition: border-color 180ms ease, box-shadow 180ms ease, background 180ms ease;
+  }
+
+  .glass-input:focus-visible {
+    box-shadow: 0 0 0 3px rgba(245, 166, 35, 0.35);
+  }
+
+  .glass-input:hover {
+    border-color: rgba(245, 166, 35, 0.35);
+  }
+
+  .glass-button {
+    @apply btn btn-primary font-semibold tracking-tight;
+    border-radius: var(--radius-control);
+    background: linear-gradient(135deg, var(--accent), var(--accent-hover));
+    border: 1px solid rgba(255, 180, 120, 0.3);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45), 0 0 18px rgba(245, 166, 35, 0.28);
+    transition: transform 180ms ease, box-shadow 180ms ease, filter 180ms ease;
+  }
+
+  .glass-button:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 18px 40px rgba(0, 0, 0, 0.6), 0 0 30px rgba(245, 166, 35, 0.45);
+  }
+
+  .glass-button:focus-visible {
+    outline: 2px solid rgba(245, 166, 35, 0.7);
+    outline-offset: 2px;
+  }
+
+  .glass-button.button-secondary {
+    @apply btn btn-ghost;
+    background: var(--surface-2);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    color: var(--text-primary);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  }
+
+  .glass-button.button-danger {
+    @apply btn-error;
+    border-radius: var(--radius-control);
+  }
+
+  .glass-nav {
+    @apply sticky top-0 z-40;
+    background: rgba(13, 12, 14, 0.9);
+    border-bottom: 1px solid rgba(255, 180, 120, 0.08);
+    backdrop-filter: blur(16px);
+  }
+
+  .nav-pill {
+    @apply btn btn-ghost justify-start gap-3 text-base-content/80;
+    border-radius: var(--radius-control);
+    transition: background 180ms ease, color 180ms ease, transform 180ms ease;
+  }
+
+  .nav-pill:hover {
+    background: rgba(255, 180, 120, 0.08);
+    color: var(--text-primary);
+    transform: translateY(-1px);
+  }
+
+  .nav-pill-active {
+    background: rgba(245, 166, 35, 0.18);
+    color: #fff7e6;
+    border: 1px solid rgba(245, 166, 35, 0.35);
+    box-shadow: 0 12px 30px rgba(245, 166, 35, 0.2);
+  }
+
+  .stats-panel {
+    @apply flex items-center gap-3;
+    background: var(--surface-1);
+    border: 1px solid var(--surface-border);
+    box-shadow:
+      0 10px 28px rgba(0, 0, 0, 0.45),
+      inset 0 1px 0 rgba(255, 180, 120, 0.06);
+    border-radius: calc(var(--radius-card) - 6px);
+  }
+
+  .fade-in {
+    @apply animate-[fadein_0.5s_ease-out];
+  }
+}
+
+@layer utilities {
+  @keyframes fadein {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+}

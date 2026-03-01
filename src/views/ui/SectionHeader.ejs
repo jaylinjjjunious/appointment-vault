@@ -1,0 +1,11 @@
+<div class="section-header <%= typeof className !== 'undefined' ? className : '' %>">
+  <div class="section-header__title">
+    <h2 class="section-header__heading"><%= title %></h2>
+    <% if (typeof subtitle === "string" && subtitle) { %>
+      <p class="section-header__subtitle"><%= subtitle %></p>
+    <% } %>
+  </div>
+  <% if (typeof actions === "string" && actions) { %>
+    <div class="section-header__actions"><%- actions %></div>
+  <% } %>
+</div>

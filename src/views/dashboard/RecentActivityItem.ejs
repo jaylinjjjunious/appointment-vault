@@ -1,0 +1,9 @@
+<li class="card glass-card appointment-card">
+  <div class="appointment-main">
+    <h3><strong><%= item.title %></strong></h3>
+    <% if (item.detail) { %>
+      <p><%= item.detail %></p>
+    <% } %>
+    <p class="section-empty"><strong>When:</strong> <%= item.timeLabel %></p>
+  </div>
+</li>

@@ -322,7 +322,7 @@ function getTargetNumberForUser(userPhoneNumber) {
   return String(process.env.CALL_TO_NUMBER || "").trim();
 }
 
-function buildVoiceMessage(appointmentTitle, appointmentDate, appointmentTime) {
+function _buildVoiceMessage(appointmentTitle, appointmentDate, appointmentTime) {
   const dateTime = new Date(`${appointmentDate}T${appointmentTime}:00`);
   const now = new Date();
   const diffMs = dateTime.getTime() - now.getTime();

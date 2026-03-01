@@ -1,0 +1,9 @@
+<div class="empty-state <%= typeof className !== 'undefined' ? className : '' %>">
+  <% if (typeof title === "string" && title) { %>
+    <h3><%= title %></h3>
+  <% } %>
+  <p><%= message %></p>
+  <% if (typeof actions === "string" && actions) { %>
+    <div class="actions"><%- actions %></div>
+  <% } %>
+</div>

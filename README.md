@@ -9,6 +9,29 @@ Appointment Vault is a beginner-friendly full-stack web app for logging and mana
 - EJS (server-rendered views)
 - SQLite (`better-sqlite3`)
 - Ollama local LLM (for AI Quick Add)
+- Tailwind CSS + DaisyUI (modern dashboard UI)
+
+## Modern UI Setup
+
+1. Install UI dependencies:
+
+```bash
+npm install
+```
+
+2. Build the Tailwind + DaisyUI stylesheet:
+
+```bash
+npm run ui:build
+```
+
+3. Optional: watch for CSS changes during development:
+
+```bash
+npm run ui:watch
+```
+
+The compiled file is written to `src/public/app.css`. The layout now uses a DaisyUI drawer sidebar + glassmorphism panels, with a theme toggle that persists in localStorage.
 
 ## Project Structure
 
@@ -368,3 +391,111 @@ Optional Twilio Console check:
 - Wait for 60-minute and 30-minute marks (or run `http://localhost:3000/twilio/test-call?minutes=30` for a fast call test)
 # appointment-vault
 
+
+## Professional Refactor Scaffold (v2)
+
+This repository now includes a production-oriented scaffold while preserving the existing appointment CRUD, AI quick-add, Google sync, and Twilio reminder flows.
+
+### New Architecture Highlights
+
+- Session persistence via SQLite-backed `better-sqlite3-session-store` (replaces in-memory default)
+- Local auth (email/password) plus existing Google OAuth path
+- Role-ready user model (`role`, `isActive`, `emailVerifiedAt`, `lastLoginAt`)
+- Security middleware: Helmet + rate limiting
+- Request correlation IDs and structured logging (Pino + pino-http)
+- Route modularization for auth + API routes
+- Zod validation schemas for auth and appointments
+- JSON API + Swagger docs at `/api/docs`
+- Appointment filtering (`title`, `dateFrom`, `dateTo`) on dashboard
+- ICS export endpoint (`GET /api/appointments/:id.ics`)
+- Backup/restore scripts for SQLite
+- Vitest + Supertest test scaffolding
+- CI scaffold (GitHub Actions)
+
+### New Key Directories
+
+```text
+src/
+  config/
+    env.js
+  docs/
+    openapi.yaml
+  lib/
+    logger.js
+  middleware/
+    authz.js
+    errorHandler.js
+    requestContext.js
+    security.js
+  routes/
+    authRoutes.js
+    api/
+      index.js
+      adminRoutes.js
+      authRoutes.js
+      appointmentsRoutes.js
+      remindersRoutes.js
+  services/
+    authService.js
+    emailService.js
+  validation/
+    authSchemas.js
+    appointmentSchemas.js
+  views/
+    auth/
+      login.ejs
+      register.ejs
+```
+
+### Setup Notes
+
+1. Install new dependencies:
+
+```bash
+npm install
+```
+
+2. Run tests:
+
+```bash
+npm run test
+```
+
+3. Open API docs:
+
+```text
+http://localhost:3000/api/docs
+```
+
+### Data & Migration Notes
+
+- `users` table now has additional columns:
+  - `passwordHash`, `role`, `emailVerifiedAt`, `lastLoginAt`, `isActive`
+- Existing data is preserved; schema migration is automatic in `src/db.js`.
+
+### New Scripts
+
+- `npm run test`
+- `npm run test:watch`
+- `npm run format`
+- `npm run backup:db`
+- `npm run restore:db -- <path-to-backup-file>`
+
+### New Environment Variables
+
+- `AUTH_REQUIRED=true`
+- `SESSION_MAX_AGE_MS=1209600000`
+- `RATE_LIMIT_WINDOW_MS=900000`
+- `RATE_LIMIT_MAX=300`
+- `SMTP_HOST=...`
+- `SMTP_PORT=587`
+- `SMTP_SECURE=false`
+- `SMTP_USER=...`
+- `SMTP_PASS=...`
+- `SMTP_FROM="Appointment Vault <no-reply@example.com>"`
+
+### Breaking Changes
+
+- Authentication is now required by default (`AUTH_REQUIRED=true`).
+- API is now available under `/api/*` and expects authenticated session context.
+- Session storage moved from memory store to SQLite-backed persistent store.

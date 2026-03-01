@@ -1,0 +1,19 @@
+<li class="card glass-card appointment-card">
+  <div class="appointment-main">
+    <h3><strong><%= item.title || item.fileName %></strong></h3>
+    <% if (item.description) { %>
+      <p><%= item.description %></p>
+    <% } %>
+    <p class="section-empty">
+      <strong>File:</strong> <%= item.fileName %> • <%= Math.ceil((item.sizeBytes || 0) / 1024) %> KB
+    </p>
+    <p class="section-empty"><strong>Uploaded:</strong> <%= item.createdAt %></p>
+  </div>
+  <div class="actions">
+    <a class="button glass-button button-secondary" href="/calendar/checkin-documents/<%= item.id %>" target="_blank" rel="noopener noreferrer">View</a>
+    <a class="button glass-button button-secondary" href="/calendar/checkin-documents/<%= item.id %>?download=1">Download</a>
+    <form action="/calendar/checkin-documents/<%= item.id %>/delete" method="POST">
+      <button class="button glass-button button-danger" type="submit">Delete</button>
+    </form>
+  </div>
+</li>

@@ -1,0 +1,9 @@
+<article class="stats-panel <%= typeof className !== 'undefined' ? className : '' %>">
+  <div>
+    <span class="text-xs uppercase tracking-widest text-base-content/50"><%= label %></span>
+    <strong class="block text-2xl font-semibold"><%= value %></strong>
+    <% if (typeof helperText === "string" && helperText) { %>
+      <span class="text-xs text-base-content/50"><%= helperText %></span>
+    <% } %>
+  </div>
+</article>
