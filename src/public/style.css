@@ -2531,3 +2531,52 @@ summary:focus-visible {
     height: 64vh;
   }
 }
+
+@media (max-width: 600px) {
+  .app-topbar {
+    padding: 0.75rem;
+  }
+
+  .topbar-right .button,
+  .topbar-right .glass-button {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .tabs-boxed {
+    flex-wrap: wrap;
+    gap: 0.4rem;
+  }
+
+  .tabs-boxed .tab {
+    flex: 1 1 100%;
+    text-align: center;
+  }
+
+  .glass-panel,
+  .card {
+    padding: 0.9rem;
+  }
+
+  .hero-card h1 {
+    font-size: 1.6rem;
+  }
+
+  .dashboard-stats {
+    gap: 0.6rem;
+  }
+}
+
+img,
+video,
+canvas,
+svg {
+  max-width: 100%;
+  height: auto;
+}
+
+table {
+  width: 100%;
+  display: block;
+  overflow-x: auto;
+}
