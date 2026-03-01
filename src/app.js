@@ -2698,14 +2698,14 @@ app.post("/api/actions/appointments", async (req, res, next) => {
     }
 
     res.json({
-      appointment_id: Number(insertInfo.lastInsertRowid),
-      calendar_event_id: calendarResult?.eventId || null,
-      calendar_link: calendarResult?.htmlLink || null,
+      appointment_id: String(insertInfo.lastInsertRowid),
+      calendar_event_id: calendarResult?.eventId || "",
+      calendar_link: calendarResult?.htmlLink || "",
       title,
       start: startIso,
       end: endIso,
       timezone,
-      notes: notes || null
+      notes: notes || ""
     });
   } catch (error) {
     console.error("Action appointment error:", error);

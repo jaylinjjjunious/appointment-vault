@@ -1,15 +1,16 @@
 openapi: 3.1.0
 info:
-  title: Appointment Vault Action API
+  title: Appointment Vault API
   version: 1.0.0
-  description: Create appointments and log them to Google Calendar.
+
 servers:
-  - url: https://YOUR_DOMAIN
+  - url: https://appointment-vault.onrender.com
+
 paths:
   /api/actions/appointments:
     post:
       operationId: createAppointmentFromAction
-      summary: Create an appointment via ChatGPT Action
+      summary: Create a calendar appointment
       security:
         - bearerAuth: []
       requestBody:
@@ -18,88 +19,37 @@ paths:
           application/json:
             schema:
               type: object
-              additionalProperties: false
               required:
                 - title
                 - start
               properties:
                 title:
                   type: string
-                  description: Appointment title.
                 start:
                   type: string
-                  description: ISO 8601 datetime string.
+                  format: date-time
                 end:
                   type: string
-                  description: ISO 8601 datetime string.
+                  format: date-time
                 timezone:
                   type: string
-                  description: IANA timezone, defaults to DEFAULT_TIMEZONE.
                 notes:
                   type: string
-                  description: Optional notes.
       responses:
         "200":
-          description: Appointment created.
+          description: Appointment created
           content:
             application/json:
               schema:
                 type: object
                 properties:
                   appointment_id:
-                    type: integer
+                    type: string
                   calendar_event_id:
                     type: string
-                    nullable: true
                   calendar_link:
                     type: string
-                    nullable: true
-                  title:
-                    type: string
-                  start:
-                    type: string
-                  end:
-                    type: string
-                  timezone:
-                    type: string
-                  notes:
-                    type: string
-                    nullable: true
-        "400":
-          description: Invalid request.
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  ok:
-                    type: boolean
-                  message:
-                    type: string
-                  errors:
-                    type: object
-        "401":
-          description: Unauthorized.
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  ok:
-                    type: boolean
-                  message:
-                    type: string
-        "500":
-          description: Server error.
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  ok:
-                    type: boolean
-                  message:
-                    type: string
+
 components:
   securitySchemes:
     bearerAuth:
