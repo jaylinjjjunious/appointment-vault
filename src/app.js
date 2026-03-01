@@ -2579,13 +2579,14 @@ app.post("/api/actions/appointments", async (req, res, next) => {
   try {
     const expectedToken = String(process.env.ACTION_API_TOKEN || "").trim();
     const authHeader = String(req.headers.authorization || "").trim();
-    console.log("EXPECTED TOKEN:", process.env.ACTION_API_TOKEN);
-    console.log("RECEIVED HEADER:", req.headers.authorization);
     const receivedToken = authHeader.toLowerCase().startsWith("bearer ")
       ? authHeader.slice(7).trim()
       : "";
 
     if (!expectedToken || !receivedToken || receivedToken !== expectedToken) {
+      console.log("EXPECTED_TOKEN_SET:", Boolean(process.env.ACTION_API_TOKEN));
+      console.log("AUTH_HEADER:", req.headers.authorization);
+      console.log("PARSED_TOKEN_PRESENT:", Boolean(receivedToken));
       res.status(401).json({ error: "Unauthorized" });
       return;
     }
