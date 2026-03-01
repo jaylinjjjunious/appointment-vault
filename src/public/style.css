@@ -2453,7 +2453,7 @@ summary:focus-visible {
   }
 
   .dashboard-stats {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: 1fr;
   }
 
   .dashboard-grid {
@@ -2471,6 +2471,27 @@ summary:focus-visible {
   .week-row {
     grid-template-columns: 1fr;
     gap: 0.3rem;
+  }
+
+  .settings-layout .tabs-boxed {
+    flex-wrap: wrap;
+    gap: 0.4rem;
+  }
+
+  .settings-layout .tabs-boxed .tab {
+    flex: 1 1 45%;
+    text-align: center;
+  }
+
+  .settings-layout .actions {
+    width: 100%;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .settings-layout .actions .button,
+  .settings-layout .actions .glass-button {
+    width: 100%;
   }
 
   .week-col {
