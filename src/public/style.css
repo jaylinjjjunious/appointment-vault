@@ -106,25 +106,44 @@ body::after {
 }
 
 .app-shell {
-    display: block;
+    display: grid;
+    grid-template-columns: 240px 1fr;
+    gap: var(--space-4);
     padding: var(--space-4);
+    padding-left: 0;
     max-width: none;
     margin: 0;
     position: relative;
     z-index: 1;
   }
 
-.app-sidebar {
-  background: #ffffff;
-  border: 1px solid var(--border-subtle);
-  border-radius: 0 var(--radius-lg) var(--radius-lg) 0;
-  padding: var(--space-4) var(--space-3);
-  box-shadow: var(--shadow-sm);
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-  background-image: none;
-}
+  .app-sidebar {
+    background: #ffffff;
+    border: 1px solid var(--border-subtle);
+    border-radius: 0 var(--radius-lg) var(--radius-lg) 0;
+    padding: var(--space-4) var(--space-3);
+    box-shadow: var(--shadow-sm);
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+    background-image: none;
+  }
+
+  .sidebar-toggle-input {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .sidebar-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(10, 10, 15, 0.5);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease;
+    z-index: 20;
+  }
 
 .sidebar-brand {
   display: flex;
@@ -262,10 +281,16 @@ body::after {
   }
 
 @media (max-width: 1024px) {
-  .sidebar-toggle {
-    display: inline-flex;
+    .sidebar-toggle {
+      display: inline-flex;
+    }
   }
-}
+
+  @media (min-width: 781px) {
+    .sidebar-overlay {
+      display: none;
+    }
+  }
 
 .topbar-left {
   flex: 1;
@@ -2349,13 +2374,28 @@ summary:focus-visible {
 }
 
 @media (max-width: 780px) {
-  .app-shell {
-      padding: 1rem;
+    .app-shell {
+        grid-template-columns: 1fr;
+        padding: 1rem;
+      }
+  
+    .app-sidebar {
+      position: fixed;
+      inset: 1rem auto 1rem 0;
+      width: 18rem;
+      transform: translateX(-120%);
+      transition: transform 0.2s ease;
+      z-index: 30;
     }
 
-  .app-sidebar {
-    position: static;
-  }
+    .sidebar-toggle-input:checked ~ .app-sidebar {
+      transform: translateX(0);
+    }
+
+    .sidebar-toggle-input:checked ~ .sidebar-overlay {
+      opacity: 1;
+      pointer-events: auto;
+    }
 
   .app-topbar {
     flex-direction: column;

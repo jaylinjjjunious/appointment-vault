@@ -36,10 +36,50 @@
     <script src="/public/ui-error-boundary.js" defer></script>
   </head>
   <body>
-    <div class="drawer lg:drawer-open">
-      <input id="sidebar-toggle" type="checkbox" class="drawer-toggle" />
-      <div class="drawer-content app-shell">
-        <div class="app-main">
+    <div class="app-shell">
+      <input id="sidebar-toggle" type="checkbox" class="sidebar-toggle-input" />
+      <aside class="app-sidebar">
+        <div class="sidebar-brand">
+          <span class="sidebar-logo">S</span>
+          <span class="sidebar-title">Appointment Vault</span>
+        </div>
+        <nav class="menu sidebar-nav" aria-label="Primary">
+          <a class="nav-pill" data-nav-key="dashboard" href="/dashboard">
+            <span class="nav-icon">DB</span>
+            <span>Dashboard</span>
+          </a>
+          <a class="nav-pill" data-nav-key="new" href="/appointments">
+            <span class="nav-icon">APT</span>
+            <span>Appointments</span>
+          </a>
+          <a class="nav-pill" data-nav-key="calendar" href="/calendar">
+            <span class="nav-icon">CAL</span>
+            <span>Calendar</span>
+          </a>
+          <a class="nav-pill" data-nav-key="settings" href="/settings">
+            <span class="nav-icon">SET</span>
+            <span>Settings</span>
+          </a>
+        </nav>
+
+        <% if (safeAuthRequired && safeCurrentUser) { %>
+          <div class="sidebar-profile">
+            <div class="sidebar-avatar" aria-hidden="true"><%= userInitial %></div>
+            <div class="sidebar-profile-meta">
+              <span class="sidebar-profile-name"><%= safeCurrentUser.displayName || safeCurrentUser.email || "User" %></span>
+              <% if (safeCurrentUser.email) { %>
+                <span class="sidebar-profile-email"><%= safeCurrentUser.email %></span>
+              <% } %>
+            </div>
+          </div>
+          <form class="sidebar-logout" action="/auth/logout" method="POST">
+            <button class="button glass-button button-secondary w-full" type="submit">Sign Out</button>
+          </form>
+        <% } %>
+      </aside>
+      <label for="sidebar-toggle" class="sidebar-overlay" aria-label="Close sidebar"></label>
+
+      <div class="app-main">
         <header class="app-topbar">
           <div class="topbar-left">
             <label for="sidebar-toggle" class="sidebar-toggle" aria-label="Toggle sidebar">
