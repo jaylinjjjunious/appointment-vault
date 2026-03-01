@@ -19,6 +19,7 @@ paths:
           application/json:
             schema:
               type: object
+              additionalProperties: false
               required:
                 - title
                 - start
@@ -51,6 +52,7 @@ paths:
                     type: string
 
 components:
+  schemas: {}
   securitySchemes:
     bearerAuth:
       type: http

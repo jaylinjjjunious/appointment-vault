@@ -85,6 +85,12 @@ async function createCalendarEvent({ title, start, end, timezone, notes }) {
       htmlLink: response?.data?.htmlLink || null
     };
   } catch (error) {
+    const apiError = error?.response?.data?.error;
+    if (apiError?.message && String(apiError.message).includes("invalid_grant")) {
+      throw new GoogleCalendarError(
+        "Google refresh token is invalid or expired. Reauthorize and update GOOGLE_REFRESH_TOKEN."
+      );
+    }
     throw new GoogleCalendarError(
       `Failed creating Google Calendar event: ${error?.message || "unknown error"}`
     );

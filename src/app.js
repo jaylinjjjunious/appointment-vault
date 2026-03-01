@@ -120,6 +120,27 @@ const {
 const { matchesAppointmentQuery } = require("./lib/search");
 require("dotenv").config({ quiet: true });
 
+(() => {
+  const missing = [];
+  if (!String(process.env.ACTION_API_TOKEN || "").trim()) {
+    missing.push("ACTION_API_TOKEN");
+  }
+  const googleRequired = [
+    "GOOGLE_CLIENT_ID",
+    "GOOGLE_CLIENT_SECRET",
+    "GOOGLE_REDIRECT_URI",
+    "GOOGLE_REFRESH_TOKEN"
+  ];
+  for (const key of googleRequired) {
+    if (!String(process.env[key] || "").trim()) {
+      missing.push(key);
+    }
+  }
+  if (missing.length > 0) {
+    console.log("Missing env vars:", missing.join(", "));
+  }
+})();
+
 const app = express();
 const SqliteStore = SqliteStoreFactory ? SqliteStoreFactory(session) : null;
 const upload = multer
@@ -2715,7 +2736,22 @@ app.post("/api/actions/appointments", async (req, res, next) => {
   } catch (error) {
     console.error("Action appointment error:", error);
     if (error instanceof GoogleCalendarError) {
-      res.status(500).json({ ok: false, message: error.message });
+      const missing = [];
+      const googleRequired = [
+        "GOOGLE_CLIENT_ID",
+        "GOOGLE_CLIENT_SECRET",
+        "GOOGLE_REDIRECT_URI",
+        "GOOGLE_REFRESH_TOKEN"
+      ];
+      for (const key of googleRequired) {
+        if (!String(process.env[key] || "").trim()) {
+          missing.push(key);
+        }
+      }
+      const detail = missing.length
+        ? ` Missing env vars: ${missing.join(", ")}.`
+        : "";
+      res.status(500).json({ ok: false, message: `${error.message}${detail}` });
       return;
     }
     next(error);
