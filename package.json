@@ -36,6 +36,7 @@
     "prepare": "husky",
     "backup:db": "node scripts/backup-db.js",
     "restore:db": "node scripts/restore-db.js",
+    "google:refresh-token": "node scripts/get-google-refresh-token.js",
     "test:smoke": "node scripts/smoke.js",
     "qa": "npm run lint && npm run test:smoke"
   },

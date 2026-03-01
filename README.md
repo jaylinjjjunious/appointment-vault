@@ -316,6 +316,21 @@ GOOGLE_CALENDAR_ID=primary
 4. Click **Authorize APIs**, sign in, then in Step 2 click **Exchange authorization code for tokens**.
 5. Copy the **refresh_token** and put it in `GOOGLE_REFRESH_TOKEN`.
 
+### Getting a Google Refresh Token (local script)
+
+1. Set these env vars locally:
+   - `GOOGLE_CLIENT_ID`
+   - `GOOGLE_CLIENT_SECRET`
+   - `GOOGLE_REDIRECT_URI`
+2. Run:
+
+```bash
+npm run google:refresh-token
+```
+
+3. Open the printed URL, approve access, then paste the code back in the terminal.
+4. Copy the refresh token into `GOOGLE_REFRESH_TOKEN`.
+
 ### Example prompts
 
 - “I have an appointment for 3pm on March 4th”
