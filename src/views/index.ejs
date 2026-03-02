@@ -41,6 +41,16 @@
   const weekCount = safeThisWeekAppointments.length;
   const upcomingCount = safeUpcomingAppointments.length;
   const totalCount = todayCount + weekCount + upcomingCount;
+  const now = new Date();
+  const currentMonth = now.getMonth();
+  const currentYear = now.getFullYear();
+  const completedThisMonth = fallbackAppointments.filter((appointment) => {
+    if (!appointment?.isCompleted) return false;
+    const dateValue = String(appointment.date || "");
+    if (!dateValue) return false;
+    const parsed = new Date(`${dateValue}T00:00:00`);
+    return parsed.getFullYear() === currentYear && parsed.getMonth() === currentMonth;
+  }).length;
   const safeCurrentUser =
     typeof currentUser !== "undefined" && currentUser ? currentUser : null;
   const userSeed =
@@ -58,6 +68,9 @@
     safeUpcomingAppointments.find((appointment) => !appointment.isCompleted) ||
     null;
   const hasAnyAppointments = todayCount + weekCount + upcomingCount > 0;
+  const nextAppointmentLabel = nextFocus
+    ? `${nextFocus.title || "Appointment"} · ${nextFocus.date} ${to12Hour(nextFocus.time)}`
+    : "No upcoming appointments";
 %>
 
 <section class="dashboard-mobile">
@@ -79,16 +92,16 @@
       </div>
       <div class="activity-metrics">
         <div class="metric">
-          <span class="metric-label">Move</span>
-          <span class="metric-value"><%= totalCount * 75 %>/<%= totalCount * 100 %>CAL</span>
+          <span class="metric-label">Today</span>
+          <span class="metric-value"><%= todayCount %> scheduled</span>
         </div>
         <div class="metric">
-          <span class="metric-label">Exercise</span>
-          <span class="metric-value"><%= totalCount * 6 %>/<%= totalCount * 10 %> MIN</span>
+          <span class="metric-label">This Week</span>
+          <span class="metric-value"><%= weekCount %> scheduled</span>
         </div>
         <div class="metric">
-          <span class="metric-label">Stand</span>
-          <span class="metric-value"><%= Math.min(12, totalCount + 2) %>/12 HR</span>
+          <span class="metric-label">Upcoming</span>
+          <span class="metric-value"><%= upcomingCount %> scheduled</span>
         </div>
       </div>
     </div>
@@ -98,13 +111,14 @@
     <section class="mobile-card">
       <p class="mobile-card-title">Trainer Tips</p>
       <p class="mobile-card-body">
-        Consistent routines help improve your upcoming schedule.
+        Next appointment:
+        <span class="mobile-card-emphasis"><%= nextAppointmentLabel %></span>
       </p>
       <div class="mobile-card-footer">with Appointment Vault</div>
     </section>
     <section class="mobile-card">
-      <p class="mobile-card-title">Step Count</p>
-      <p class="mobile-step-value"><%= totalCount * 1200 %></p>
+      <p class="mobile-card-title">Completed This Month</p>
+      <p class="mobile-step-value"><%= completedThisMonth %></p>
       <div class="mobile-step-bars">
         <span></span><span></span><span></span><span></span><span></span><span></span>
       </div>
@@ -113,7 +127,7 @@
 
   <section class="mobile-card mobile-promo-card">
     <p class="mobile-card-title">For Today</p>
-    <p class="mobile-card-body">Stay on track with your appointments.</p>
+    <p class="mobile-card-body"><%= nextAppointmentLabel %></p>
     <div class="mobile-promo-footer">Powered by Appointment Vault</div>
   </section>
 

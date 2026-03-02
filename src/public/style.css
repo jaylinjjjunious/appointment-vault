@@ -2685,6 +2685,13 @@ summary:focus-visible {
     color: rgba(255, 255, 255, 0.65);
   }
 
+  .mobile-card-emphasis {
+    display: block;
+    color: rgba(255, 255, 255, 0.9);
+    font-weight: 600;
+    margin-top: 0.35rem;
+  }
+
   .mobile-card-footer {
     margin-top: 0.8rem;
     font-size: 0.7rem;
