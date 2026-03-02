@@ -35,7 +35,7 @@
     <script src="/public/ui-activity.js" defer></script>
     <script src="/public/ui-error-boundary.js" defer></script>
   </head>
-  <body>
+  <body class="<%= typeof page !== 'undefined' && page ? `page-${page}` : '' %>">
     <div class="app-shell">
       <input id="sidebar-toggle" type="checkbox" class="sidebar-toggle-input" />
       <aside class="app-sidebar">

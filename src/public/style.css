@@ -2536,6 +2536,190 @@ summary:focus-visible {
     min-height: 64vh;
     height: 64vh;
   }
+
+  body.page-dashboard .app-topbar {
+    display: none;
+  }
+
+  body.page-dashboard .app-content {
+    padding-top: 0.5rem;
+  }
+}
+
+.dashboard-mobile {
+  display: none;
+}
+
+@media (max-width: 780px) {
+  .dashboard-desktop {
+    display: none;
+  }
+
+  .dashboard-mobile {
+    display: block;
+    color: #f5f5f5;
+  }
+
+  body.page-dashboard {
+    background: #0b0b0b;
+  }
+
+  body.page-dashboard .app-shell {
+    padding: 1.25rem 1.25rem 2rem;
+  }
+
+  body.page-dashboard .app-main {
+    max-width: none;
+    width: 100%;
+  }
+
+  .mobile-summary-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 1rem;
+  }
+
+  .mobile-summary-title {
+    font-size: 1.4rem;
+    font-weight: 600;
+    margin: 0;
+  }
+
+  .mobile-summary-date {
+    margin: 0.25rem 0 0;
+    color: rgba(255, 255, 255, 0.6);
+    font-size: 0.85rem;
+  }
+
+  .mobile-avatar {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.12);
+    display: grid;
+    place-items: center;
+    font-weight: 600;
+  }
+
+  .mobile-card {
+    background: #1b1b1f;
+    border-radius: 18px;
+    padding: 1rem;
+    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.35);
+  }
+
+  .mobile-activity-card {
+    margin-bottom: 1rem;
+  }
+
+  .mobile-activity-header {
+    font-weight: 600;
+    margin-bottom: 0.75rem;
+  }
+
+  .mobile-activity-body {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+  }
+
+  .activity-rings {
+    position: relative;
+    width: 96px;
+    height: 96px;
+  }
+
+  .activity-rings .ring {
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    border: 8px solid rgba(255, 255, 255, 0.08);
+  }
+
+  .activity-rings .ring-move {
+    border-color: rgba(255, 59, 48, 0.9);
+    inset: 0;
+  }
+
+  .activity-rings .ring-exercise {
+    border-color: rgba(48, 209, 88, 0.9);
+    inset: 10px;
+  }
+
+  .activity-rings .ring-stand {
+    border-color: rgba(64, 156, 255, 0.9);
+    inset: 20px;
+  }
+
+  .activity-metrics {
+    display: grid;
+    gap: 0.4rem;
+    font-size: 0.8rem;
+  }
+
+  .metric-label {
+    color: rgba(255, 255, 255, 0.6);
+    display: block;
+    font-size: 0.7rem;
+  }
+
+  .metric-value {
+    font-weight: 600;
+  }
+
+  .mobile-card-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.8rem;
+    margin-bottom: 1rem;
+  }
+
+  .mobile-card-title {
+    font-weight: 600;
+    margin-bottom: 0.4rem;
+  }
+
+  .mobile-card-body {
+    font-size: 0.78rem;
+    color: rgba(255, 255, 255, 0.65);
+  }
+
+  .mobile-card-footer {
+    margin-top: 0.8rem;
+    font-size: 0.7rem;
+    color: rgba(255, 255, 255, 0.5);
+  }
+
+  .mobile-step-value {
+    font-size: 1.4rem;
+    font-weight: 600;
+    margin: 0.5rem 0 0.2rem;
+  }
+
+  .mobile-step-bars {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 4px;
+    margin-top: 0.4rem;
+  }
+
+  .mobile-step-bars span {
+    display: block;
+    height: 24px;
+    background: rgba(255, 255, 255, 0.14);
+    border-radius: 8px;
+  }
+
+  .mobile-promo-card {
+    background: #2c1b12;
+  }
+
+  .mobile-promo-footer {
+    margin-top: 0.6rem;
+    font-size: 0.7rem;
+    color: rgba(255, 255, 255, 0.6);
+  }
 }
 
 @media (max-width: 600px) {
