@@ -2720,6 +2720,40 @@ summary:focus-visible {
     font-size: 0.7rem;
     color: rgba(255, 255, 255, 0.6);
   }
+
+  .mobile-tab-bar {
+    position: sticky;
+    bottom: 0;
+    margin-top: 1.4rem;
+    padding: 0.6rem 0.75rem;
+    background: #111115;
+    border-radius: 22px;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 0.4rem;
+    box-shadow: 0 -6px 20px rgba(0, 0, 0, 0.35);
+  }
+
+  .mobile-tab {
+    display: grid;
+    justify-items: center;
+    gap: 0.2rem;
+    font-size: 0.7rem;
+    color: rgba(255, 255, 255, 0.65);
+    text-decoration: none;
+    padding: 0.35rem 0.25rem;
+    border-radius: 16px;
+  }
+
+  .mobile-tab .tab-icon {
+    font-size: 1rem;
+    line-height: 1;
+  }
+
+  .mobile-tab.active {
+    color: #f5c24b;
+    background: rgba(245, 194, 75, 0.12);
+  }
 }
 
 @media (max-width: 600px) {
