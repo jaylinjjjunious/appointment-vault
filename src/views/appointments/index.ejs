@@ -1,4 +1,4 @@
-<%- include("../partials/top", { title }) %>
+<%- include("../partials/top", { title, page: "appointments" }) %>
 <%
   const safeFilters = typeof filters === "object" && filters ? filters : { title: "", dateFrom: "", dateTo: "" };
   const todoMessage = typeof todoStatusMessage === "string" ? todoStatusMessage : "";

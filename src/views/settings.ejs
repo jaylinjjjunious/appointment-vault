@@ -1,4 +1,4 @@
-<%- include("partials/top", { title }) %>
+<%- include("partials/top", { title, page: "settings" }) %>
 <%
   const safeHistoryAppointments =
     typeof historyAppointments !== "undefined" && Array.isArray(historyAppointments)
