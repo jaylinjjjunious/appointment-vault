@@ -2764,6 +2764,21 @@ summary:focus-visible {
 }
 
 @media (max-width: 780px) {
+  body.page-dashboard .tab-summary,
+  body.page-appointments .tab-appointments,
+  body.page-appointment-form .tab-appointments,
+  body.page-appointment-view .tab-appointments,
+  body.page-calendar .tab-calendar,
+  body.page-settings .tab-settings,
+  body.page-settings-history .tab-settings,
+  body.page-agent .tab-appointments,
+  body.page-checkin .tab-calendar {
+    color: #f5c24b;
+    background: rgba(245, 194, 75, 0.12);
+  }
+}
+
+@media (max-width: 780px) {
   body.page-appointments,
   body.page-appointment-form,
   body.page-appointment-view,
