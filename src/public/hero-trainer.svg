@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" role="img" aria-label="Trainer silhouette">
+  <defs>
+    <linearGradient id="trainerGlow" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0" stop-color="#9df76a"/>
+      <stop offset="1" stop-color="#4ad7ff"/>
+    </linearGradient>
+  </defs>
+  <circle cx="100" cy="50" r="22" fill="url(#trainerGlow)"/>
+  <path
+    d="M70 170c0-24 14-46 30-46s30 22 30 46"
+    fill="none"
+    stroke="url(#trainerGlow)"
+    stroke-width="14"
+    stroke-linecap="round"
+  />
+  <path
+    d="M66 104c12-18 24-26 34-26s22 8 34 26"
+    fill="none"
+    stroke="url(#trainerGlow)"
+    stroke-width="12"
+    stroke-linecap="round"
+  />
+  <path
+    d="M50 130c14-6 28-8 50-8s36 2 50 8"
+    fill="none"
+    stroke="url(#trainerGlow)"
+    stroke-width="10"
+    stroke-linecap="round"
+    opacity="0.8"
+  />
+</svg>

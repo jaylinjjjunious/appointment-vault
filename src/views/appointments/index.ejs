@@ -14,7 +14,7 @@
   <div class="page-actions">
     <a class="button glass-button" href="/appointments/new" data-activity="appointment_create" data-activity-title="Started new appointment">New Appointment</a>
     <a class="button glass-button button-secondary" href="/appointments#quick-add">Quick Add</a>
-    <a class="button glass-button button-secondary" href="/calendar">Open Calendar</a>
+    <a class="button glass-button button-secondary" href="#calendar-panel">Calendar Panel</a>
   </div>
 
   <div data-tab-root>
@@ -204,6 +204,40 @@
       </p>
     </section>
   </div>
+</section>
+
+<section id="calendar-panel" class="card glass-panel calendar-panel">
+  <div class="section-heading">
+    <h2>Calendar</h2>
+    <p>Your Google Calendar opens directly inside this panel.</p>
+  </div>
+
+  <% if (!googleConnected) { %>
+    <p class="section-empty">Google Calendar is not connected yet.</p>
+    <div class="actions">
+      <a class="button glass-button" href="/auth/google" data-activity="google_connect" data-activity-title="Connected Google Calendar">Connect Google Calendar</a>
+    </div>
+  <% } else { %>
+    <div class="actions">
+      <a
+        class="button glass-button button-secondary"
+        href="<%= calendarEmbedUrl %>"
+        target="_blank"
+        rel="noopener noreferrer"
+      >
+        Open In New Tab
+      </a>
+    </div>
+    <div class="checkin-embed-wrap">
+      <iframe
+        class="checkin-embed"
+        src="<%= calendarEmbedUrl %>"
+        title="Google Calendar Panel"
+        loading="eager"
+        referrerpolicy="no-referrer-when-downgrade"
+      ></iframe>
+    </div>
+  <% } %>
 </section>
 
 <script>

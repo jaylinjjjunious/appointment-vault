@@ -2573,21 +2573,21 @@ summary:focus-visible {
     width: 100%;
   }
 
-  .mobile-summary-header {
+  .mobile-fitness-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin-bottom: 1rem;
+    margin-bottom: 0.9rem;
   }
 
-  .mobile-summary-title {
-    font-size: 1.4rem;
+  .mobile-fitness-title {
+    font-size: 1.5rem;
     font-weight: 600;
     margin: 0;
   }
 
-  .mobile-summary-date {
-    margin: 0.25rem 0 0;
+  .mobile-fitness-date {
+    margin: 0.2rem 0 0;
     color: rgba(255, 255, 255, 0.6);
     font-size: 0.85rem;
   }
@@ -2602,145 +2602,176 @@ summary:focus-visible {
     font-weight: 600;
   }
 
-  .mobile-card {
-    background: #1b1b1f;
-    border-radius: 18px;
-    padding: 1rem;
-    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.35);
-  }
-
-  .mobile-activity-card {
-    margin-bottom: 1rem;
-  }
-
-  .mobile-activity-header {
-    font-weight: 600;
-    margin-bottom: 0.75rem;
-  }
-
-  .mobile-activity-body {
+  .mobile-pill-nav {
     display: flex;
-    gap: 1rem;
-    align-items: center;
-  }
-
-  .activity-rings {
-    position: relative;
-    width: 96px;
-    height: 96px;
-  }
-
-  .activity-rings .ring {
-    position: absolute;
-    inset: 0;
-    border-radius: 50%;
-    border: 8px solid rgba(255, 255, 255, 0.08);
-  }
-
-  .activity-rings .ring-move {
-    border-color: rgba(255, 59, 48, 0.9);
-    inset: 0;
-  }
-
-  .activity-rings .ring-exercise {
-    border-color: rgba(48, 209, 88, 0.9);
-    inset: 10px;
-  }
-
-  .activity-rings .ring-stand {
-    border-color: rgba(64, 156, 255, 0.9);
-    inset: 20px;
-  }
-
-  .activity-metrics {
-    display: grid;
     gap: 0.4rem;
-    font-size: 0.8rem;
-  }
-
-  .metric-label {
-    color: rgba(255, 255, 255, 0.6);
-    display: block;
-    font-size: 0.7rem;
-  }
-
-  .metric-value {
-    font-weight: 600;
-  }
-
-  .metric-move .metric-label,
-  .metric-move .metric-value {
-    color: rgba(255, 59, 48, 0.9);
-  }
-
-  .metric-exercise .metric-label,
-  .metric-exercise .metric-value {
-    color: rgba(48, 209, 88, 0.9);
-  }
-
-  .metric-stand .metric-label,
-  .metric-stand .metric-value {
-    color: rgba(64, 156, 255, 0.9);
-  }
-
-  .mobile-card-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 0.8rem;
+    background: #141416;
+    border-radius: 999px;
+    padding: 0.3rem;
     margin-bottom: 1rem;
   }
 
-  .mobile-card-title {
-    font-weight: 600;
+  .mobile-pill-nav .pill {
+    flex: 1;
+    text-align: center;
+    font-size: 0.7rem;
+    color: rgba(255, 255, 255, 0.65);
+    text-decoration: none;
+    padding: 0.35rem 0.6rem;
+    border-radius: 999px;
+  }
+
+  .mobile-pill-nav .pill-active {
+    background: rgba(255, 255, 255, 0.12);
+    color: #fff;
+  }
+
+  .mobile-hero-card {
+    background: #1a1a1c;
+    border-radius: 26px;
+    overflow: hidden;
+    box-shadow: 0 18px 30px rgba(0, 0, 0, 0.45);
+    margin-bottom: 1.4rem;
+  }
+
+  .hero-media {
+    position: relative;
+    min-height: 220px;
+    background: linear-gradient(135deg, rgba(16, 24, 18, 0.95), rgba(66, 50, 26, 0.95));
+    display: grid;
+    place-items: center;
+  }
+
+  .hero-badge {
+    position: absolute;
+    top: 12px;
+    left: 12px;
+    background: rgba(15, 45, 25, 0.85);
+    color: #9df76a;
+    padding: 0.3rem 0.65rem;
+    border-radius: 999px;
+    font-size: 0.6rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .hero-figure {
+    width: 150px;
+    height: 150px;
+    background: url("/public/hero-trainer.svg") center/contain no-repeat;
+    opacity: 0.95;
+  }
+
+  .hero-body {
+    padding: 1rem 1.1rem 1.2rem;
+    background: linear-gradient(180deg, rgba(33, 33, 35, 0.95), rgba(26, 26, 28, 1));
+  }
+
+  .hero-eyebrow {
+    color: rgba(255, 255, 255, 0.55);
+    font-size: 0.7rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    margin-bottom: 0.35rem;
+  }
+
+  .hero-title {
+    font-size: 1.2rem;
+    margin: 0 0 0.35rem;
+  }
+
+  .hero-meta {
+    color: rgba(255, 255, 255, 0.7);
+    font-size: 0.8rem;
     margin-bottom: 0.4rem;
   }
 
-  .mobile-card-body {
+  .hero-location {
+    color: rgba(255, 255, 255, 0.85);
     font-size: 0.78rem;
-    color: rgba(255, 255, 255, 0.65);
+    margin-bottom: 0.45rem;
   }
 
-  .mobile-card-emphasis {
-    display: block;
-    color: rgba(255, 255, 255, 0.9);
+  .hero-attribution {
+    color: rgba(255, 255, 255, 0.4);
+    font-size: 0.65rem;
+    margin-bottom: 0.6rem;
+  }
+
+  .hero-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.55rem 1.2rem;
+    border-radius: 999px;
+    background: #c7f20a;
+    color: #0b0b0b;
     font-weight: 600;
-    margin-top: 0.35rem;
+    text-decoration: none;
+    font-size: 0.8rem;
   }
 
-  .mobile-card-footer {
-    margin-top: 0.8rem;
+  .mobile-section {
+    margin-bottom: 1.4rem;
+  }
+
+  .mobile-section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 0.7rem;
+  }
+
+  .mobile-section-title {
+    font-size: 0.95rem;
+    font-weight: 600;
+    margin: 0;
+  }
+
+  .mobile-section-subtitle {
+    font-size: 0.65rem;
+    color: rgba(255, 255, 255, 0.5);
+    margin-top: 0.1rem;
+  }
+
+  .mobile-section-meta {
     font-size: 0.7rem;
     color: rgba(255, 255, 255, 0.5);
   }
 
-  .mobile-step-value {
-    font-size: 1.4rem;
-    font-weight: 600;
-    margin: 0.5rem 0 0.2rem;
-  }
-
-  .mobile-step-bars {
+  .mobile-scroll {
     display: grid;
-    grid-template-columns: repeat(6, 1fr);
-    gap: 4px;
-    margin-top: 0.4rem;
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(150px, 1fr);
+    gap: 0.75rem;
+    overflow-x: auto;
+    padding-bottom: 0.4rem;
   }
 
-  .mobile-step-bars span {
-    display: block;
-    height: 24px;
-    background: rgba(255, 255, 255, 0.14);
-    border-radius: 8px;
+  .mini-card {
+    background: #1b1b1f;
+    border-radius: 18px;
+    padding: 0.75rem;
+    text-decoration: none;
+    color: inherit;
+    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.35);
   }
 
-  .mobile-promo-card {
-    background: #2c1b12;
+  .mini-card-title {
+    font-weight: 600;
+    margin-bottom: 0.35rem;
+    font-size: 0.85rem;
   }
 
-  .mobile-promo-footer {
-    margin-top: 0.6rem;
+  .mini-card-body {
     font-size: 0.7rem;
-    color: rgba(255, 255, 255, 0.6);
+    color: rgba(255, 255, 255, 0.65);
+    margin-bottom: 0.25rem;
+  }
+
+  .mini-card-sub {
+    font-size: 0.65rem;
+    color: rgba(255, 255, 255, 0.5);
   }
 
   .mobile-tab-bar {
@@ -2748,12 +2779,12 @@ summary:focus-visible {
     bottom: 0;
     margin-top: 1.4rem;
     padding: 0.6rem 0.75rem;
-    background: #111115;
+    background: #0f0f12;
     border-radius: 22px;
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(3, 1fr);
     gap: 0.4rem;
-    box-shadow: 0 -6px 20px rgba(0, 0, 0, 0.35);
+    box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.45);
   }
 
   .mobile-tab {
@@ -2773,23 +2804,21 @@ summary:focus-visible {
   }
 
   .mobile-tab.active {
-    color: #f5c24b;
-    background: rgba(245, 194, 75, 0.12);
+    color: #c7f20a;
+    background: rgba(199, 242, 10, 0.12);
   }
 }
 
 @media (max-width: 780px) {
-  body.page-dashboard .tab-summary,
+  body.page-dashboard .tab-dashboard,
   body.page-appointments .tab-appointments,
   body.page-appointment-form .tab-appointments,
   body.page-appointment-view .tab-appointments,
-  body.page-calendar .tab-calendar,
   body.page-settings .tab-settings,
   body.page-settings-history .tab-settings,
-  body.page-agent .tab-appointments,
-  body.page-checkin .tab-calendar {
-    color: #f5c24b;
-    background: rgba(245, 194, 75, 0.12);
+  body.page-agent .tab-appointments {
+    color: #c7f20a;
+    background: rgba(199, 242, 10, 0.12);
   }
 }
 

@@ -102,6 +102,7 @@ const {
   runCalendarAssistant,
   submitCalendarToolResult
 } = require("./openaiCalendarAgent");
+const { searchOpenStreetMapLocation } = require("./osmSearch");
 const {
   logTwilioEnvStatus,
   startReminderScheduler,
@@ -1610,7 +1611,7 @@ app.get("/", (req, res) => {
     return;
   }
 
-  res.redirect("/calendar");
+  res.redirect("/dashboard");
 });
 
 app.get("/dashboard", async (req, res) => {
@@ -1668,9 +1669,27 @@ app.get("/dashboard", async (req, res) => {
       todoItems = [];
     }
 
+    const nextFocus =
+      dashboardData.todayAppointments.find((appointment) => !appointment.isCompleted) ||
+      dashboardData.thisWeekAppointments.find((appointment) => !appointment.isCompleted) ||
+      dashboardData.upcomingAppointments.find((appointment) => !appointment.isCompleted) ||
+      null;
+    const nextLocationQuery = String(nextFocus?.location || "").trim();
+    let nextLocationResult = null;
+    if (nextLocationQuery) {
+      try {
+        nextLocationResult = await searchOpenStreetMapLocation(nextLocationQuery);
+      } catch (locationError) {
+        nextLocationResult = null;
+      }
+    }
+
     res.render("index", {
       ...viewModel,
       ...dashboardData,
+      nextFocus,
+      nextLocationQuery,
+      nextLocationResult,
       googleStatusMessage,
       todoStatusMessage,
       todoItems,
@@ -1735,7 +1754,11 @@ app.get("/appointments", async (req, res) => {
       ...viewModel,
       ...dashboardData,
       todoStatusMessage,
-      todoItems
+      todoItems,
+      calendarEmbedUrl: buildGoogleCalendarEmbedUrl(
+        String(user.email || req.persistedGoogleProfile?.email || "primary").trim() || "primary",
+        user.timezone || APP_TIMEZONE
+      )
     });
   } catch (error) {
     console.error("Appointments list load failed:", error.message);

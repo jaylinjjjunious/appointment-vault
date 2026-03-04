@@ -62,75 +62,95 @@
     month: "short",
     day: "numeric"
   });
-  const nextFocus =
+  const nextFocusFromServer = typeof nextFocus !== "undefined" ? nextFocus : null;
+  const resolvedNextFocus =
+    nextFocusFromServer ||
     safeTodayAppointments.find((appointment) => !appointment.isCompleted) ||
     safeThisWeekAppointments.find((appointment) => !appointment.isCompleted) ||
     safeUpcomingAppointments.find((appointment) => !appointment.isCompleted) ||
     null;
-  const hasAnyAppointments = todayCount + weekCount + upcomingCount > 0;
-  const nextAppointmentLabel = nextFocus
-    ? `${nextFocus.title || "Appointment"} · ${nextFocus.date} ${to12Hour(nextFocus.time)}`
+  const nextAppointmentLabel = resolvedNextFocus
+    ? `${resolvedNextFocus.title || "Appointment"} · ${resolvedNextFocus.date} ${to12Hour(resolvedNextFocus.time)}`
     : "No upcoming appointments";
+  const nextLocationQueryValue =
+    typeof nextLocationQuery !== "undefined" ? String(nextLocationQuery || "").trim() : "";
+  const nextLocationResultValue =
+    typeof nextLocationResult !== "undefined" ? nextLocationResult : null;
+  const locationDisplay =
+    nextLocationResultValue?.displayName ||
+    nextLocationQueryValue ||
+    String(resolvedNextFocus?.location || "").trim() ||
+    "Add a location to view nearby details.";
+  const highlightAppointments = [
+    ...safeTodayAppointments.filter((appointment) => !appointment.isCompleted),
+    ...safeThisWeekAppointments.filter((appointment) => !appointment.isCompleted),
+    ...safeUpcomingAppointments.filter((appointment) => !appointment.isCompleted)
+  ]
+    .filter(Boolean)
+    .slice(0, 4);
+  const nextFocusHref = resolvedNextFocus?.id
+    ? `/appointments/${resolvedNextFocus.id}`
+    : "/appointments";
 %>
 
 <section class="dashboard-mobile">
-  <header class="mobile-summary-header">
+  <header class="mobile-fitness-header">
     <div>
-      <p class="mobile-summary-title">Summary</p>
-      <p class="mobile-summary-date"><%= mobileDate %></p>
+      <p class="mobile-fitness-title">Appointment Vault</p>
+      <p class="mobile-fitness-date"><%= mobileDate %></p>
     </div>
     <div class="mobile-avatar"><%= userInitial %></div>
   </header>
 
-  <section class="mobile-card mobile-activity-card">
-    <div class="mobile-activity-header">Activity</div>
-    <div class="mobile-activity-body">
-      <div class="activity-rings">
-        <span class="ring ring-move"></span>
-        <span class="ring ring-exercise"></span>
-        <span class="ring ring-stand"></span>
-      </div>
-      <div class="activity-metrics">
-        <div class="metric metric-move">
-          <span class="metric-label">Today</span>
-          <span class="metric-value"><%= todayCount %> scheduled</span>
-        </div>
-        <div class="metric metric-exercise">
-          <span class="metric-label">This Week</span>
-          <span class="metric-value"><%= weekCount %> scheduled</span>
-        </div>
-        <div class="metric metric-stand">
-          <span class="metric-label">Upcoming</span>
-          <span class="metric-value"><%= upcomingCount %> scheduled</span>
-        </div>
-      </div>
+  <nav class="mobile-pill-nav">
+    <a class="pill pill-active" href="/dashboard">Dashboard</a>
+    <a class="pill" href="/appointments">Appointments</a>
+    <a class="pill" href="/settings">Settings</a>
+  </nav>
+
+  <section class="mobile-hero-card">
+    <div class="hero-media">
+      <span class="hero-badge">View Plan</span>
+      <div class="hero-figure" aria-hidden="true"></div>
+    </div>
+    <div class="hero-body">
+      <p class="hero-eyebrow">For Today</p>
+      <h3 class="hero-title"><%= resolvedNextFocus ? resolvedNextFocus.title : "No upcoming appointments" %></h3>
+      <p class="hero-meta"><%= resolvedNextFocus ? `${resolvedNextFocus.date} · ${to12Hour(resolvedNextFocus.time)}` : "Plan your next visit." %></p>
+      <p class="hero-location"><%= locationDisplay %></p>
+      <% if (nextLocationResultValue) { %>
+        <p class="hero-attribution">Map data © OpenStreetMap contributors</p>
+      <% } %>
+      <a class="hero-button" href="<%= nextFocusHref %>">Open Appointment</a>
     </div>
   </section>
 
-  <div class="mobile-card-grid">
-    <section class="mobile-card">
-      <p class="mobile-card-title">Trainer Tips</p>
-      <p class="mobile-card-body">
-        Next appointment:
-        <span class="mobile-card-emphasis"><%= nextAppointmentLabel %></span>
-      </p>
-      <div class="mobile-card-footer">with Appointment Vault</div>
-    </section>
-    <section class="mobile-card">
-      <p class="mobile-card-title">Completed This Month</p>
-      <p class="mobile-step-value"><%= completedThisMonth %></p>
-      <div class="mobile-step-bars">
-        <span></span><span></span><span></span><span></span><span></span><span></span>
+  <section class="mobile-section">
+    <div class="mobile-section-header">
+      <div>
+        <p class="mobile-section-title">Strength</p>
+        <p class="mobile-section-subtitle">More of what you do</p>
       </div>
-    </section>
-  </div>
-
-  <section class="mobile-card mobile-promo-card">
-    <p class="mobile-card-title">For Today</p>
-    <p class="mobile-card-body"><%= nextAppointmentLabel %></p>
-    <div class="mobile-promo-footer">Powered by Appointment Vault</div>
+      <p class="mobile-section-meta"><%= totalCount %> total</p>
+    </div>
+    <div class="mobile-scroll">
+      <% if (highlightAppointments.length === 0) { %>
+        <div class="mini-card">
+          <p class="mini-card-title">No upcoming appointments</p>
+          <p class="mini-card-body">Add your next visit to start tracking.</p>
+        </div>
+      <% } %>
+      <% highlightAppointments.forEach((item) => { %>
+        <a class="mini-card" href="/appointments/<%= item.id %>">
+          <p class="mini-card-title"><%= item.title || "Appointment" %></p>
+          <p class="mini-card-body"><%= item.date %> · <%= to12Hour(item.time) %></p>
+          <% if (item.location) { %>
+            <p class="mini-card-sub"><%= item.location %></p>
+          <% } %>
+        </a>
+      <% }) %>
+    </div>
   </section>
-
 </section>
 
 <div class="dashboard-desktop">

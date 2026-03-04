@@ -47,7 +47,7 @@
           </div>
           <div class="actions">
             <% if (appointment.isExternalGoogle) { %>
-              <a class="button glass-button button-secondary" href="/calendar">Open in Calendar</a>
+              <a class="button glass-button button-secondary" href="/appointments#calendar-panel">Open in Calendar</a>
             <% } else { %>
               <a class="button glass-button button-secondary" href="/appointments/<%= appointment.id %>">View</a>
               <a class="button glass-button button-secondary" href="/appointments/<%= appointment.id %>/edit">Edit</a>
@@ -100,7 +100,7 @@
           <div class="week-col"><%= appointment.reminderMinutes !== null ? appointment.reminderMinutes + " min" : "—" %></div>
           <div class="week-actions">
             <% if (appointment.isExternalGoogle) { %>
-              <a class="button glass-button button-secondary" href="/calendar">Open in Calendar</a>
+              <a class="button glass-button button-secondary" href="/appointments#calendar-panel">Open in Calendar</a>
             <% } else { %>
               <a class="button glass-button button-secondary" href="/appointments/<%= appointment.id %>">View</a>
               <a class="button glass-button button-secondary" href="/appointments/<%= appointment.id %>/edit">Edit</a>
@@ -163,7 +163,7 @@
           </div>
           <div class="actions">
             <% if (appointment.isExternalGoogle) { %>
-              <a class="button glass-button button-secondary" href="/calendar">Open in Calendar</a>
+              <a class="button glass-button button-secondary" href="/appointments#calendar-panel">Open in Calendar</a>
             <% } else { %>
               <a class="button glass-button button-secondary" href="/appointments/<%= appointment.id %>">View</a>
               <a class="button glass-button button-secondary" href="/appointments/<%= appointment.id %>/edit">Edit</a>
