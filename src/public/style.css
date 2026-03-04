@@ -2668,6 +2668,21 @@ summary:focus-visible {
     font-weight: 600;
   }
 
+  .metric-move .metric-label,
+  .metric-move .metric-value {
+    color: rgba(255, 59, 48, 0.9);
+  }
+
+  .metric-exercise .metric-label,
+  .metric-exercise .metric-value {
+    color: rgba(48, 209, 88, 0.9);
+  }
+
+  .metric-stand .metric-label,
+  .metric-stand .metric-value {
+    color: rgba(64, 156, 255, 0.9);
+  }
+
   .mobile-card-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
