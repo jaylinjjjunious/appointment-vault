@@ -2669,6 +2669,20 @@ summary:focus-visible {
     background: linear-gradient(135deg, rgba(16, 24, 18, 0.95), rgba(66, 50, 26, 0.95));
     display: grid;
     place-items: center;
+    background-size: cover;
+    background-position: center;
+  }
+
+  .hero-media.has-map::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(180deg, rgba(0, 0, 0, 0.2), rgba(0, 0, 0, 0.75));
+  }
+
+  .hero-media.has-map > * {
+    position: relative;
+    z-index: 1;
   }
 
   .hero-badge {

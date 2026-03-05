@@ -81,6 +81,16 @@
     nextLocationQueryValue ||
     String(resolvedNextFocus?.location || "").trim() ||
     "Add a location to view nearby details.";
+  const mapLat = nextLocationResultValue?.lat ? String(nextLocationResultValue.lat) : "";
+  const mapLon = nextLocationResultValue?.lon ? String(nextLocationResultValue.lon) : "";
+  const mapImageUrl =
+    mapLat && mapLon
+      ? `https://staticmap.openstreetmap.de/staticmap.php?center=${encodeURIComponent(
+          `${mapLat},${mapLon}`
+        )}&zoom=14&size=640x360&maptype=mapnik&markers=${encodeURIComponent(
+          `${mapLat},${mapLon},lightblue1`
+        )}`
+      : "";
   const highlightAppointments = [
     ...safeTodayAppointments.filter((appointment) => !appointment.isCompleted),
     ...safeThisWeekAppointments.filter((appointment) => !appointment.isCompleted),
@@ -109,9 +119,11 @@
   </nav>
 
   <section class="mobile-hero-card">
-    <div class="hero-media">
+    <div class="hero-media <%= mapImageUrl ? 'has-map' : '' %>" <%= mapImageUrl ? `style="background-image: url('${mapImageUrl}');"` : "" %>>
       <span class="hero-badge">View Plan</span>
-      <div class="hero-figure" aria-hidden="true"></div>
+      <% if (!mapImageUrl) { %>
+        <div class="hero-figure" aria-hidden="true"></div>
+      <% } %>
     </div>
     <div class="hero-body">
       <p class="hero-eyebrow">For Today</p>
