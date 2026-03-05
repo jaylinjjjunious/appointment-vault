@@ -15,6 +15,22 @@
     safeCurrentUser &&
     (safeCurrentUser.displayName || safeCurrentUser.email || "U");
   const userInitial = userSeed ? userSeed.trim().charAt(0).toUpperCase() : "U";
+  const pageKey = typeof page !== "undefined" ? String(page || "") : "";
+  const showMobileHeader = [
+    "appointments",
+    "appointment-form",
+    "appointment-view",
+    "settings",
+    "settings-history",
+    "calendar",
+    "agent",
+    "checkin"
+  ].includes(pageKey);
+  const mobileHeaderDate = new Date().toLocaleDateString("en-US", {
+    weekday: "long",
+    month: "short",
+    day: "numeric"
+  });
 %>
 <!DOCTYPE html>
 <html lang="en" data-theme="vaultDark">
@@ -112,3 +128,18 @@
         </header>
 
         <main class="app-content">
+          <% if (showMobileHeader) { %>
+            <header class="mobile-page-header">
+              <div>
+                <p class="mobile-fitness-title"><%= title %></p>
+                <p class="mobile-fitness-date"><%= mobileHeaderDate %></p>
+              </div>
+              <div class="mobile-avatar"><%= userInitial %></div>
+            </header>
+
+            <nav class="mobile-pill-nav">
+              <a class="pill <%= pageKey === 'dashboard' ? 'pill-active' : '' %>" href="/dashboard">Dashboard</a>
+              <a class="pill <%= pageKey.includes('appointment') ? 'pill-active' : '' %>" href="/appointments">Appointments</a>
+              <a class="pill <%= pageKey.startsWith('settings') ? 'pill-active' : '' %>" href="/settings">Settings</a>
+            </nav>
+          <% } %>
