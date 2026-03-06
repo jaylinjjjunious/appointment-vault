@@ -2584,6 +2584,29 @@ summary:focus-visible {
     padding: 1.25rem 1.25rem 2rem;
   }
 
+  body.page-appointments .app-main,
+  body.page-appointment-form .app-main,
+  body.page-appointment-view .app-main,
+  body.page-settings .app-main,
+  body.page-settings-history .app-main,
+  body.page-calendar .app-main,
+  body.page-agent .app-main,
+  body.page-checkin .app-main {
+    max-width: 100%;
+    width: 100%;
+  }
+
+  body.page-appointments .app-content,
+  body.page-appointment-form .app-content,
+  body.page-appointment-view .app-content,
+  body.page-settings .app-content,
+  body.page-settings-history .app-content,
+  body.page-calendar .app-content,
+  body.page-agent .app-content,
+  body.page-checkin .app-content {
+    padding: 0;
+  }
+
   body.page-appointments .app-topbar,
   body.page-appointment-form .app-topbar,
   body.page-appointment-view .app-topbar,
