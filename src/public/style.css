@@ -2607,6 +2607,12 @@ summary:focus-visible {
     padding: 0;
   }
 
+  body.page-appointments,
+  body.page-appointment-form,
+  body.page-appointment-view {
+    overflow-x: hidden;
+  }
+
   body.page-appointments .app-topbar,
   body.page-appointment-form .app-topbar,
   body.page-appointment-view .app-topbar,
@@ -2831,15 +2837,14 @@ summary:focus-visible {
 
   .appointments-hero-scroll {
     display: grid;
-    grid-auto-flow: column;
-    grid-auto-columns: minmax(80vw, 1fr);
+    grid-template-columns: 1fr;
     gap: 1rem;
-    overflow-x: auto;
+    overflow-x: hidden;
     padding-bottom: 0.6rem;
   }
 
   .appointments-hero-scroll .mobile-hero-card {
-    min-width: 80vw;
+    min-width: 100%;
   }
 
   .appointments-mobile-heroes {
@@ -2855,12 +2860,11 @@ summary:focus-visible {
   }
 
   .appointments-hero-scroll::-webkit-scrollbar {
-    height: 6px;
+    height: 0;
   }
 
   .appointments-hero-scroll::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.2);
-    border-radius: 999px;
+    background: transparent;
   }
 
   .appointment-hero {
