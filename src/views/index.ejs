@@ -114,7 +114,15 @@
     <a class="pill" href="/settings">Settings</a>
   </nav>
 
-  <section class="mobile-hero-card">
+  <section
+    class="mobile-hero-card appointment-hero"
+    data-hero
+    data-title="<%= resolvedNextFocus ? resolvedNextFocus.title : 'Appointment' %>"
+    data-date="<%= resolvedNextFocus ? resolvedNextFocus.date : '' %>"
+    data-time="<%= resolvedNextFocus ? resolvedNextFocus.time : '' %>"
+    data-location="<%= resolvedNextFocus ? (resolvedNextFocus.location || '') : '' %>"
+    data-link="<%= nextFocusHref %>"
+  >
     <div class="hero-media <%= mapEmbedUrl ? 'has-map' : '' %>">
       <% if (mapEmbedUrl) { %>
         <iframe
@@ -167,6 +175,31 @@
     </div>
   </section>
 </section>
+
+<div class="hero-modal" data-hero-modal hidden>
+  <div class="hero-modal-backdrop" data-hero-close></div>
+  <div class="hero-modal-card" role="dialog" aria-modal="true" aria-label="Appointment details">
+    <button class="hero-modal-close" type="button" data-hero-close aria-label="Close">✕</button>
+    <div class="hero-modal-header">
+      <div>
+        <p class="hero-modal-eyebrow">Appointment</p>
+        <h3 class="hero-modal-title" data-hero-title>Appointment</h3>
+        <p class="hero-modal-meta" data-hero-meta></p>
+      </div>
+    </div>
+
+    <nav class="mobile-pill-nav hero-modal-nav">
+      <a class="pill pill-active" href="/dashboard">Dashboard</a>
+      <a class="pill" href="/appointments">Appointments</a>
+      <a class="pill" href="/settings">Settings</a>
+    </nav>
+
+    <div class="hero-modal-body">
+      <p class="hero-modal-location" data-hero-location></p>
+      <a class="hero-button" data-hero-link href="/appointments">Open Appointment</a>
+    </div>
+  </div>
+</div>
 
 <div class="dashboard-desktop">
 <section id="dashboard-top" class="dashboard-intro glass-panel flex flex-col lg:flex-row lg:items-center gap-6 hero-card">
@@ -354,6 +387,46 @@
     });
 
     setActive(root.getAttribute("data-toggle-root") || "quick");
+  })();
+</script>
+<script>
+  (() => {
+    const modal = document.querySelector("[data-hero-modal]");
+    if (!modal) return;
+    const titleEl = modal.querySelector("[data-hero-title]");
+    const metaEl = modal.querySelector("[data-hero-meta]");
+    const locationEl = modal.querySelector("[data-hero-location]");
+    const linkEl = modal.querySelector("[data-hero-link]");
+
+    const openModal = (data) => {
+      if (titleEl) titleEl.textContent = data.title || "Appointment";
+      if (metaEl) metaEl.textContent = `${data.date || ""} ${data.time || ""}`.trim();
+      if (locationEl) locationEl.textContent = data.location || "No location provided.";
+      if (linkEl && data.link) linkEl.setAttribute("href", data.link);
+      modal.hidden = false;
+      document.body.classList.add("modal-open");
+    };
+
+    const closeModal = () => {
+      modal.hidden = true;
+      document.body.classList.remove("modal-open");
+    };
+
+    document.querySelectorAll("[data-hero]").forEach((card) => {
+      card.addEventListener("click", () => {
+        openModal({
+          title: card.getAttribute("data-title"),
+          date: card.getAttribute("data-date"),
+          time: card.getAttribute("data-time"),
+          location: card.getAttribute("data-location"),
+          link: card.getAttribute("data-link")
+        });
+      });
+    });
+
+    modal.querySelectorAll("[data-hero-close]").forEach((btn) => {
+      btn.addEventListener("click", closeModal);
+    });
   })();
 </script>
 <%- include("partials/bottom") %>
