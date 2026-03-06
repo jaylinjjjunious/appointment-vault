@@ -2613,6 +2613,40 @@ summary:focus-visible {
     overflow-x: hidden;
   }
 
+  body.page-appointments {
+    overflow: hidden;
+  }
+
+  body.page-appointments .app-shell,
+  body.page-appointments .app-main,
+  body.page-appointments .app-content {
+    height: 100vh;
+    height: 100svh;
+    max-height: 100vh;
+    max-height: 100svh;
+  }
+
+  body.page-appointments .app-content {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  body.page-appointments .appointments-mobile-heroes {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+  }
+
+  body.page-appointments .appointments-hero-scroll {
+    flex: 1;
+  }
+
+  body.page-appointments .appointments-tools-trigger {
+    margin-top: auto;
+    padding-bottom: 0.5rem;
+  }
+
   body.page-appointments .app-topbar,
   body.page-appointment-form .app-topbar,
   body.page-appointment-view .app-topbar,
