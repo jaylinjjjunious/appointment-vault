@@ -2802,6 +2802,23 @@ summary:focus-visible {
     padding-bottom: 0.4rem;
   }
 
+  .appointments-mobile-heroes {
+    margin-bottom: 1.2rem;
+  }
+
+  .appointments-hero-scroll {
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(280px, 1fr);
+    gap: 1rem;
+    overflow-x: auto;
+    padding-bottom: 0.6rem;
+  }
+
+  .appointments-hero-scroll .mobile-hero-card {
+    min-width: 280px;
+  }
+
   .mini-card {
     background: #1b1b1f;
     border-radius: 18px;
