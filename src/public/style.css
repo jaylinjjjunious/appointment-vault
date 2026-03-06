@@ -2819,6 +2819,82 @@ summary:focus-visible {
     min-width: 280px;
   }
 
+  .appointment-hero {
+    border: 0;
+    text-align: left;
+    cursor: pointer;
+  }
+
+  .appointment-hero .hero-button {
+    pointer-events: none;
+  }
+
+  .hero-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 50;
+  }
+
+  .hero-modal-backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.6);
+  }
+
+  .hero-modal-card {
+    position: relative;
+    z-index: 1;
+    margin: 12vh auto 0;
+    width: min(92vw, 420px);
+    background: #1b1b1f;
+    border-radius: 22px;
+    padding: 1.2rem;
+    box-shadow: 0 18px 36px rgba(0, 0, 0, 0.45);
+  }
+
+  .hero-modal-close {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    border: 0;
+    background: rgba(255, 255, 255, 0.1);
+    color: #fff;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    cursor: pointer;
+  }
+
+  .hero-modal-eyebrow {
+    font-size: 0.7rem;
+    color: rgba(255, 255, 255, 0.6);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+  }
+
+  .hero-modal-title {
+    margin: 0.2rem 0 0.4rem;
+  }
+
+  .hero-modal-meta {
+    color: rgba(255, 255, 255, 0.7);
+    font-size: 0.85rem;
+  }
+
+  .hero-modal-nav {
+    margin: 1rem 0;
+  }
+
+  .hero-modal-location {
+    color: rgba(255, 255, 255, 0.8);
+    font-size: 0.85rem;
+    margin-bottom: 1rem;
+  }
+
+  body.modal-open {
+    overflow: hidden;
+  }
+
   .mini-card {
     background: #1b1b1f;
     border-radius: 18px;
