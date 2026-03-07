@@ -2618,6 +2618,20 @@ summary:focus-visible {
     overflow-y: auto;
   }
 
+  body.page-appointments input,
+  body.page-appointments textarea,
+  body.page-appointments select,
+  body.page-appointments button {
+    font-size: 16px;
+  }
+
+  body.page-appointments .mobile-page-header,
+  body.page-appointments .mobile-tab-bar {
+    width: 100%;
+    max-width: 100%;
+    transform: none;
+  }
+
   body.page-appointments .app-shell,
   body.page-appointments .app-main,
   body.page-appointments .app-content {
