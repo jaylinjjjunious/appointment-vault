@@ -3330,6 +3330,42 @@ svg {
   height: auto;
 }
 
+iframe {
+  max-width: 100%;
+}
+
+html,
+body {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+.app-shell,
+.app-main,
+.app-content {
+  width: 100%;
+  max-width: 100%;
+}
+
+.checkin-embed-wrap,
+.checkin-embed {
+  width: 100%;
+  max-width: 100%;
+}
+
+@media (max-width: 780px) {
+  .app-shell {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+
+  .app-content {
+    padding-left: 0;
+    padding-right: 0;
+  }
+}
+
 table {
   width: 100%;
   display: block;
