@@ -2632,6 +2632,28 @@ summary:focus-visible {
     transform: none;
   }
 
+  body.page-appointments .mobile-pill-nav {
+    background: #141416;
+    border-radius: 999px;
+    padding: 0.3rem;
+  }
+
+  body.page-appointments .mobile-pill-nav .pill {
+    font-size: 0.7rem;
+    padding: 0.35rem 0.6rem;
+  }
+
+  body.page-appointments .mobile-tab-bar {
+    padding: 0.6rem 0.75rem;
+    border-radius: 22px;
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  body.page-appointments .mobile-tab {
+    font-size: 0.7rem;
+    padding: 0.35rem 0.25rem;
+  }
+
   body.page-appointments .app-shell,
   body.page-appointments .app-main,
   body.page-appointments .app-content {
