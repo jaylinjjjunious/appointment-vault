@@ -2640,6 +2640,7 @@ summary:focus-visible {
 
   body.page-appointments .app-main,
   body.page-appointments .app-content {
+    overflow-x: hidden;
     overflow-x: clip;
   }
 
