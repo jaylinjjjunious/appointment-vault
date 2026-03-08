@@ -3045,6 +3045,13 @@ summary:focus-visible {
   }
 
   .appointment-hero {
+    appearance: none;
+    -webkit-appearance: none;
+    display: block;
+    width: 100%;
+    padding: 0;
+    margin: 0;
+    background: #1a1a1c;
     border: 0;
     text-align: left;
     cursor: pointer;

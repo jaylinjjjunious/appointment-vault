@@ -85,7 +85,7 @@
     nextLocationResultValue || nextLocationQueryValue
       ? `https://www.google.com/maps?q=${encodeURIComponent(
           nextLocationResultValue?.displayName || nextLocationQueryValue
-        )}&output=embed`
+        )}&t=k&output=embed`
       : "";
   const highlightAppointments = [
     ...safeTodayAppointments.filter((appointment) => !appointment.isCompleted),
