@@ -3,6 +3,17 @@
   const safeFilters = typeof filters === "object" && filters ? filters : { title: "", dateFrom: "", dateTo: "" };
   const todoMessage = typeof todoStatusMessage === "string" ? todoStatusMessage : "";
   const safeTodoItems = Array.isArray(todoItems) ? todoItems : [];
+  const safeCurrentUser =
+    typeof currentUser !== "undefined" && currentUser ? currentUser : null;
+  const userSeed =
+    safeCurrentUser &&
+    (safeCurrentUser.displayName || safeCurrentUser.email || "U");
+  const userInitial = userSeed ? userSeed.trim().charAt(0).toUpperCase() : "U";
+  const mobileDate = new Date().toLocaleDateString("en-US", {
+    weekday: "long",
+    month: "short",
+    day: "numeric"
+  });
   const safeAppointments =
     typeof appointments !== "undefined" && Array.isArray(appointments) ? appointments : [];
   const appointmentHeroes = safeAppointments
@@ -29,12 +40,28 @@
     });
 %>
 
+<section class="appointments-mobile-shell mobile-layout-contract">
+  <header class="mobile-fitness-header">
+    <div>
+      <p class="mobile-fitness-title">Appointments</p>
+      <p class="mobile-fitness-date"><%= mobileDate %></p>
+    </div>
+    <div class="mobile-avatar"><%= userInitial %></div>
+  </header>
+
+  <nav class="mobile-pill-nav">
+    <a class="pill" href="/dashboard">Dashboard</a>
+    <a class="pill pill-active" href="/appointments">Appointments</a>
+    <a class="pill" href="/settings">Settings</a>
+  </nav>
+</section>
+
 <section class="page-heading">
   <h1>Appointments</h1>
   <p>Manage your schedule, search, and To-Dos in one place.</p>
 </section>
 
-<section class="appointments-mobile-heroes">
+<section class="appointments-mobile-heroes mobile-layout-contract">
   <div class="mobile-section-header">
     <div>
       <p class="mobile-section-title">Upcoming Appointments</p>
@@ -119,7 +146,7 @@
   </div>
 </div>
 
-<section class="appointments-tools-trigger">
+<section class="appointments-tools-trigger mobile-layout-contract">
   <button class="hero-button" type="button" data-tools-open>Open Appointment Tools</button>
 </section>
 
@@ -372,7 +399,6 @@
     </section>
   </div>
 </div>
-
 <script>
   (() => {
     const root = document.querySelector("[data-tab-root]");

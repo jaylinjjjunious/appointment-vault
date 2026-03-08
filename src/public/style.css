@@ -2550,12 +2550,33 @@ summary:focus-visible {
   display: none;
 }
 
+.mobile-layout-contract {
+  width: 100%;
+  max-width: 100%;
+}
+
+.appointments-mobile-shell {
+  display: none;
+}
+
 @media (max-width: 780px) {
   .dashboard-desktop {
     display: none;
   }
 
   .dashboard-mobile {
+    display: block;
+    color: #f5f5f5;
+  }
+
+  .mobile-layout-contract {
+    width: min(100%, 540px);
+    max-width: 100%;
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  .appointments-mobile-shell {
     display: block;
     color: #f5f5f5;
   }
@@ -2607,6 +2628,21 @@ summary:focus-visible {
     padding: 0;
   }
 
+  body.page-appointments .app-shell,
+  body.page-appointments .app-main,
+  body.page-appointments .app-content {
+    box-sizing: border-box;
+  }
+
+  body.page-appointments .app-content > * {
+    min-width: 0;
+  }
+
+  body.page-appointments .app-main,
+  body.page-appointments .app-content {
+    overflow-x: clip;
+  }
+
   body.page-appointments,
   body.page-appointment-form,
   body.page-appointment-view {
@@ -2632,10 +2668,31 @@ summary:focus-visible {
     transform: none;
   }
 
+  body.page-appointments .mobile-page-header,
+  body.page-appointments .mobile-pill-nav,
+  body.page-appointments .appointments-mobile-shell,
+  body.page-appointments .appointments-mobile-heroes,
+  body.page-appointments .appointments-tools-trigger,
+  body.page-appointments #calendar-panel,
+  body.page-appointments #appointments-sections,
+  body.page-appointments .checkin-embed-wrap,
+  body.page-appointments .checkin-embed,
+  body.page-appointments .appointment-card,
+  body.page-appointments .week-row {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+  }
+
   body.page-appointments .mobile-pill-nav {
     background: #141416;
     border-radius: 999px;
     padding: 0.3rem;
+  }
+
+  body.page-appointments .mobile-section-header,
+  body.page-appointments .mobile-section-header > div {
+    min-width: 0;
   }
 
   body.page-appointments .mobile-pill-nav .pill {
@@ -2725,6 +2782,7 @@ summary:focus-visible {
     text-decoration: none;
     padding: 0.35rem 0.6rem;
     border-radius: 999px;
+    min-width: 0;
   }
 
   .mobile-pill-nav .pill-active {
@@ -2886,16 +2944,75 @@ summary:focus-visible {
   .appointments-hero-scroll {
     display: grid;
     grid-auto-flow: column;
-    grid-auto-columns: minmax(85vw, 1fr);
+    grid-auto-columns: minmax(0, 100%);
     gap: 1rem;
     overflow-x: auto;
     scroll-snap-type: x mandatory;
     padding-bottom: 0.6rem;
+    width: 100%;
+    max-width: 100%;
   }
 
   .appointments-hero-scroll .mobile-hero-card {
-    min-width: 85vw;
+    min-width: 0;
+    width: 100%;
+    max-width: 100%;
     scroll-snap-align: start;
+  }
+
+  .appointments-hero-scroll > * {
+    min-width: 0;
+    box-sizing: border-box;
+  }
+
+  .appointments-hero-scroll .mobile-hero-card,
+  .appointments-hero-scroll .hero-body,
+  .appointments-hero-scroll .hero-media,
+  .appointments-hero-scroll .hero-map,
+  .appointments-hero-scroll .hero-button {
+    max-width: 100%;
+  }
+
+  .appointment-card .appointment-main,
+  .todo-list .appointment-card .appointment-main {
+    min-width: 0;
+    max-width: 100%;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+
+  .appointment-card .actions,
+  .todo-list .appointment-card .actions,
+  .week-actions,
+  .week-actions .inline-nav-form,
+  .week-actions .button,
+  .appointment-card .actions form,
+  .appointment-card .actions .button,
+  .todo-list .appointment-card .actions form,
+  .todo-list .appointment-card .actions .button {
+    max-width: 100%;
+  }
+
+  body.page-appointments .tools-modal-card,
+  body.page-appointments .tools-panel,
+  body.page-appointments .tools-panel [data-tab-root],
+  body.page-appointments .tools-panel .tabs,
+  body.page-appointments .tools-panel .tabs-boxed,
+  body.page-appointments .tools-panel .tab {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+  }
+
+  body.page-appointments .tools-panel .tabs {
+    display: flex;
+    flex-wrap: wrap;
+  }
+
+  body.page-appointments .tools-panel .tabs-boxed .tab {
+    flex: 1 1 48%;
+    text-align: center;
   }
 
   .appointments-mobile-heroes {
@@ -2904,6 +3021,13 @@ summary:focus-visible {
 
   .appointments-mobile-heroes .mobile-section-header {
     width: 100%;
+  }
+
+  .appointments-tools-trigger {
+    width: 100%;
+    max-width: 100%;
+    margin-left: auto;
+    margin-right: auto;
   }
 
   .appointments-hero-scroll {
