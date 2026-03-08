@@ -83,9 +83,9 @@
     "Add a location to view nearby details.";
   const mapEmbedUrl =
     nextLocationResultValue || nextLocationQueryValue
-      ? `https://www.google.com/maps?q=${encodeURIComponent(
+      ? `https://www.google.com/maps?hl=en&q=${encodeURIComponent(
           nextLocationResultValue?.displayName || nextLocationQueryValue
-        )}&t=k&output=embed`
+        )}&t=k&z=16&output=embed`
       : "";
   const highlightAppointments = [
     ...safeTodayAppointments.filter((appointment) => !appointment.isCompleted),

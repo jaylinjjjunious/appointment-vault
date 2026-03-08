@@ -27,7 +27,7 @@
     .map((appointment) => {
       const locationValue = String(appointment.location || "").trim();
       const mapEmbedUrl = locationValue
-        ? `https://www.google.com/maps?q=${encodeURIComponent(locationValue)}&t=k&output=embed`
+        ? `https://www.google.com/maps?hl=en&q=${encodeURIComponent(locationValue)}&t=k&z=16&output=embed`
         : "";
       return {
         id: appointment.id,
