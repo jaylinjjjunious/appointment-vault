@@ -399,6 +399,18 @@ app.use((req, res, next) => {
 
     req.currentUser = user || null;
     if (req.currentUser) {
+      if (
+        String(req.session?.authProvider || "").trim() === "local" &&
+        req.method === "GET" &&
+        req.path === "/"
+      ) {
+        console.log("[auth-local] login success snapshot:", {
+          sessionId: req.sessionID || null,
+          sessionUserId: req.session?.userId || null,
+          currentUser: req.currentUser || null,
+          cookieHeader: String(req.headers.cookie || "")
+        });
+      }
       req.persistedGoogleProfile = {
         provider: String(req.currentUser.provider || "local").trim() || "local",
         providerUserId: String(req.currentUser.providerUserId || "").trim(),
