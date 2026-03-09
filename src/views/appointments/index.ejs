@@ -134,13 +134,24 @@
       </div>
     </div>
 
-    <nav class="mobile-pill-nav hero-modal-nav">
-      <a class="pill pill-active" href="/dashboard">Dashboard</a>
-      <a class="pill" href="/appointments">Appointments</a>
-      <a class="pill" href="/settings">Settings</a>
-    </nav>
-
     <div class="hero-modal-body">
+      <div class="hero-modal-info">
+        <p class="hero-modal-location-label">Destination</p>
+        <p class="hero-modal-location" data-hero-location></p>
+        <div class="hero-modal-actions">
+          <a
+            class="hero-button hero-route-button"
+            data-hero-route
+            href="https://www.google.com/maps"
+            target="_blank"
+            rel="noopener noreferrer"
+            hidden
+          >
+            Start Route
+          </a>
+          <a class="hero-button hero-open-button" data-hero-link href="/appointments">Open Appointment</a>
+        </div>
+      </div>
       <div class="hero-modal-map-wrap" data-hero-map-wrap hidden>
         <iframe
           class="hero-modal-map"
@@ -151,8 +162,6 @@
           referrerpolicy="no-referrer-when-downgrade"
         ></iframe>
       </div>
-      <p class="hero-modal-location" data-hero-location></p>
-      <a class="hero-button" data-hero-link href="/appointments">Open Appointment</a>
     </div>
   </div>
 </div>
@@ -475,6 +484,7 @@
     const metaEl = modal.querySelector("[data-hero-meta]");
     const locationEl = modal.querySelector("[data-hero-location]");
     const linkEl = modal.querySelector("[data-hero-link]");
+    const routeEl = modal.querySelector("[data-hero-route]");
     const mapWrapEl = modal.querySelector("[data-hero-map-wrap]");
     const mapEl = modal.querySelector("[data-hero-map]");
 
@@ -484,6 +494,18 @@
       if (locationEl) locationEl.textContent = data.location || "No location provided.";
       if (linkEl && data.link) linkEl.setAttribute("href", data.link);
       const mapQuery = String(data.map || data.location || "").trim();
+      if (routeEl) {
+        if (mapQuery) {
+          routeEl.setAttribute(
+            "href",
+            `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(mapQuery)}`
+          );
+          routeEl.hidden = false;
+        } else {
+          routeEl.hidden = true;
+          routeEl.setAttribute("href", "https://www.google.com/maps");
+        }
+      }
       if (mapWrapEl && mapEl) {
         if (mapQuery) {
           mapEl.setAttribute(
@@ -508,6 +530,7 @@
       }, 220);
       document.body.classList.remove("modal-open");
       if (mapEl) mapEl.setAttribute("src", "");
+      if (routeEl) routeEl.hidden = true;
     };
 
     document.querySelectorAll("[data-hero]").forEach((card) => {
