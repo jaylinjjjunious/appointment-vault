@@ -210,6 +210,17 @@ const BUILD_BRANCH =
 const BUILD_INSTANCE =
   String(process.env.RENDER_INSTANCE_ID || process.env.HOSTNAME || "unknown").trim() || "unknown";
 const LEGACY_APPOINTMENT_ASSIGNMENT_KEY = "legacy.appointments.assigned";
+
+function ensureUsersGoogleTokensColumn() {
+  const userColumns = db.prepare("PRAGMA table_info(users)").all();
+  const hasGoogleTokensJson = userColumns.some((column) => column && column.name === "googleTokensJson");
+  if (!hasGoogleTokensJson) {
+    db.exec("ALTER TABLE users ADD COLUMN googleTokensJson TEXT");
+  }
+}
+
+ensureUsersGoogleTokensColumn();
+
 const selectAppSettingStatement = db.prepare("SELECT value FROM app_settings WHERE key = ?");
 const upsertAppSettingStatement = db.prepare(`
   INSERT INTO app_settings (key, value, updatedAt)
