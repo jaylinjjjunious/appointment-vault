@@ -332,7 +332,7 @@ app.use(
     proxy: IS_PRODUCTION,
     cookie: {
       httpOnly: true,
-      sameSite: IS_PRODUCTION ? "none" : "lax",
+      sameSite: "lax",
       secure: IS_PRODUCTION,
       path: "/",
       maxAge: runtimeEnv.session.maxAgeMs
@@ -1543,6 +1543,11 @@ app.get("/auth/google/callback", async (req, res, next) => {
       console.error("[google-oauth] post-login persistence failed:", persistenceError.message);
     }
     console.log("[google-oauth] assigned user id:", user.id);
+    console.log("[google-oauth] callback session snapshot:", {
+      sessionId: req.sessionID || null,
+      sessionUserId: req.session?.userId || null,
+      hasCurrentUser: Boolean(req.currentUser)
+    });
 
     req.session.save((sessionError) => {
       if (sessionError) {
@@ -1811,6 +1816,11 @@ app.get("/", (req, res) => {
 });
 
 app.get("/dashboard", async (req, res) => {
+  console.log("[dashboard] session snapshot:", {
+    sessionId: req.sessionID || null,
+    sessionUserId: req.session?.userId || null,
+    hasCurrentUser: Boolean(req.currentUser)
+  });
   const user = requireCurrentUser(req, res);
   if (!user) {
     return;
