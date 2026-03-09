@@ -25,7 +25,7 @@ module.exports = {
     host: String(process.env.HOST || "0.0.0.0").trim() || "0.0.0.0",
     baseUrl: String(process.env.PUBLIC_BASE_URL || "http://localhost:3000").trim() || "http://localhost:3000",
     dataDir: String(process.env.DATA_DIR || path.join(__dirname, "..", "..", "data")).trim(),
-    authRequired: toBool(process.env.AUTH_REQUIRED, true)
+    authRequired: toBool(process.env.AUTH_REQUIRED, false)
   },
   session: {
     secret: String(process.env.SESSION_SECRET || "appointment-vault-session-secret-change-me").trim(),

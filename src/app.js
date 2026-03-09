@@ -155,7 +155,7 @@ const upload = multer
   : null;
 const fallbackEnv = {
   app: {
-    authRequired: true,
+    authRequired: false,
     port: Number.parseInt(String(process.env.PORT || "3000"), 10) || 3000,
     host: "0.0.0.0"
   },
