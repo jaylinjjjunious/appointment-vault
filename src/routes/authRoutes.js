@@ -144,7 +144,10 @@ router.get("/login", csrfProtection, (req, res) => {
     });
     return;
   }
-  res.redirect("/auth/google");
+  renderAuthPage(res, "auth/login", {
+    title: "Sign In",
+    csrfToken: req.csrfToken()
+  });
 });
 
 router.post("/login", loginIpLimiter, loginEmailLimiter, csrfProtection, async (req, res, next) => {
