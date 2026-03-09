@@ -426,6 +426,10 @@
     const routeEl = modal.querySelector("[data-hero-route]");
     const mapWrapEl = modal.querySelector("[data-hero-map-wrap]");
     const mapEl = modal.querySelector("[data-hero-map]");
+    const modalCardEl = modal.querySelector(".hero-modal-card");
+    let touchStartY = 0;
+    let swipeDeltaY = 0;
+    let isSwipingSheet = false;
 
     const openModal = (data) => {
       if (titleEl) titleEl.textContent = data.title || "Appointment";
@@ -463,6 +467,10 @@
     };
 
     const closeModal = () => {
+      if (modalCardEl) {
+        modalCardEl.style.transition = "";
+        modalCardEl.style.transform = "";
+      }
       modal.classList.remove("is-open");
       setTimeout(() => {
         modal.hidden = true;
@@ -470,6 +478,39 @@
       document.body.classList.remove("modal-open");
       if (mapEl) mapEl.setAttribute("src", "");
       if (routeEl) routeEl.hidden = true;
+    };
+
+    const handleTouchStart = (event) => {
+      if (!modalCardEl || event.touches.length !== 1) return;
+      if (modalCardEl.scrollTop > 0) {
+        isSwipingSheet = false;
+        return;
+      }
+      touchStartY = event.touches[0].clientY;
+      swipeDeltaY = 0;
+      isSwipingSheet = true;
+      modalCardEl.style.transition = "none";
+    };
+
+    const handleTouchMove = (event) => {
+      if (!modalCardEl || !isSwipingSheet || event.touches.length !== 1) return;
+      const currentY = event.touches[0].clientY;
+      swipeDeltaY = Math.max(0, currentY - touchStartY);
+      if (swipeDeltaY > 0) {
+        event.preventDefault();
+        modalCardEl.style.transform = `translateY(${swipeDeltaY}px)`;
+      }
+    };
+
+    const handleTouchEnd = () => {
+      if (!modalCardEl || !isSwipingSheet) return;
+      isSwipingSheet = false;
+      modalCardEl.style.transition = "";
+      modalCardEl.style.transform = "";
+      if (swipeDeltaY > 110) {
+        closeModal();
+      }
+      swipeDeltaY = 0;
     };
 
     document.querySelectorAll("[data-hero]").forEach((card) => {
@@ -488,6 +529,13 @@
     modal.querySelectorAll("[data-hero-close]").forEach((btn) => {
       btn.addEventListener("click", closeModal);
     });
+
+    if (modalCardEl) {
+      modalCardEl.addEventListener("touchstart", handleTouchStart, { passive: true });
+      modalCardEl.addEventListener("touchmove", handleTouchMove, { passive: false });
+      modalCardEl.addEventListener("touchend", handleTouchEnd, { passive: true });
+      modalCardEl.addEventListener("touchcancel", handleTouchEnd, { passive: true });
+    }
   })();
 </script>
 <%- include("partials/bottom") %>
