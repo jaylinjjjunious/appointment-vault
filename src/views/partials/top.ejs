@@ -195,12 +195,10 @@
             </div>
           </div>
           <script>
-            (() => {
-              const hub = document.querySelector("[data-profile-hub]");
-              const trigger = document.querySelector("[data-profile-trigger]");
-              const pill = document.querySelector("[data-profile-pill]");
+            window.addEventListener("DOMContentLoaded", () => {
+              const hubs = Array.from(document.querySelectorAll("[data-profile-hub]"));
               const modal = document.querySelector("[data-profile-mini-modal]");
-              if (!hub || !trigger || !pill || !modal) return;
+              if (hubs.length === 0 || !modal) return;
 
               const titleEl = modal.querySelector("[data-profile-mini-title]");
               const metaEl = modal.querySelector("[data-profile-mini-meta]");
@@ -208,16 +206,14 @@
               const openFullEl = modal.querySelector("[data-profile-mini-open-full]");
               const closeButtons = Array.from(modal.querySelectorAll("[data-profile-mini-close]"));
 
-              const closePill = () => {
-                hub.classList.remove("is-open");
-                trigger.setAttribute("aria-expanded", "false");
-                pill.hidden = true;
-              };
-
-              const openPill = () => {
-                hub.classList.add("is-open");
-                trigger.setAttribute("aria-expanded", "true");
-                pill.hidden = false;
+              const closeAllPills = () => {
+                hubs.forEach((hub) => {
+                  const trigger = hub.querySelector("[data-profile-trigger]");
+                  const pill = hub.querySelector("[data-profile-pill]");
+                  hub.classList.remove("is-open");
+                  if (trigger) trigger.setAttribute("aria-expanded", "false");
+                  if (pill) pill.hidden = true;
+                });
               };
 
               const closeMini = () => {
@@ -242,18 +238,25 @@
                 requestAnimationFrame(() => modal.classList.add("is-open"));
               };
 
-              trigger.addEventListener("click", (event) => {
-                event.stopPropagation();
-                if (hub.classList.contains("is-open")) {
-                  closePill();
-                } else {
-                  openPill();
-                }
+              hubs.forEach((hub) => {
+                const trigger = hub.querySelector("[data-profile-trigger]");
+                const pill = hub.querySelector("[data-profile-pill]");
+                if (!trigger || !pill) return;
+                trigger.addEventListener("click", (event) => {
+                  event.stopPropagation();
+                  const isOpen = hub.classList.contains("is-open");
+                  closeAllPills();
+                  if (!isOpen) {
+                    hub.classList.add("is-open");
+                    trigger.setAttribute("aria-expanded", "true");
+                    pill.hidden = false;
+                  }
+                });
               });
 
-              pill.querySelectorAll("[data-profile-open]").forEach((button) => {
+              document.querySelectorAll("[data-profile-open]").forEach((button) => {
                 button.addEventListener("click", () => {
-                  closePill();
+                  closeAllPills();
                   openMini(button);
                 });
               });
@@ -263,18 +266,18 @@
               });
 
               document.addEventListener("click", (event) => {
-                if (!hub.contains(event.target)) {
-                  closePill();
+                if (!hubs.some((hub) => hub.contains(event.target))) {
+                  closeAllPills();
                 }
               });
 
               document.addEventListener("keydown", (event) => {
                 if (event.key === "Escape") {
-                  closePill();
+                  closeAllPills();
                   closeMini();
                 }
               });
-            })();
+            });
           </script>
         <% } %>
 
@@ -285,7 +288,44 @@
                 <p class="mobile-fitness-title"><%= title %></p>
                 <p class="mobile-fitness-date"><%= mobileHeaderDate %></p>
               </div>
-              <div class="mobile-avatar"><%= userInitial %></div>
+              <% if (safeCurrentUser) { %>
+                <div class="profile-hub" data-profile-hub>
+                  <button
+                    type="button"
+                    class="mobile-avatar profile-trigger"
+                    data-profile-trigger
+                    aria-expanded="false"
+                    aria-haspopup="true"
+                    aria-label="Open profile controls"
+                  >
+                    <%= userInitial %>
+                  </button>
+                  <div class="profile-control-pill" data-profile-pill hidden>
+                    <button
+                      type="button"
+                      class="profile-control-button"
+                      data-profile-open="calendar"
+                      data-profile-src="/calendar"
+                      data-profile-title="Calendar"
+                      data-profile-meta="View your calendar panel"
+                    >
+                      Calendar
+                    </button>
+                    <button
+                      type="button"
+                      class="profile-control-button"
+                      data-profile-open="checkin"
+                      data-profile-src="/checkin"
+                      data-profile-title="Check-In"
+                      data-profile-meta="Open your check-in panel"
+                    >
+                      Check-In
+                    </button>
+                  </div>
+                </div>
+              <% } else { %>
+                <div class="mobile-avatar"><%= userInitial %></div>
+              <% } %>
             </header>
 
             <nav class="mobile-pill-nav">
