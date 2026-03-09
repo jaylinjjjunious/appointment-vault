@@ -147,7 +147,7 @@
                     type="button"
                     class="profile-control-button"
                     data-profile-open="checkin"
-                    data-profile-src="/checkin"
+                    data-profile-src="https://www.cecheckin.com/client/account/signin"
                     data-profile-title="Check-In"
                     data-profile-meta="Open your check-in panel"
                   >
@@ -178,18 +178,22 @@
                     data-profile-mini-open-full
                     href="/calendar"
                   >
-                    Open Full Page
+                    Open Calendar Page
+                  </a>
+                  <a
+                    class="hero-button hero-open-button"
+                    data-profile-mini-open-external
+                    href="https://calendar.google.com/calendar/u/0/r"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    Open Google Calendar
                   </a>
                 </div>
-                <div class="profile-mini-embed-wrap">
-                  <iframe
-                    class="profile-mini-embed"
-                    data-profile-mini-embed
-                    src=""
-                    title="Quick panel"
-                    loading="lazy"
-                    referrerpolicy="no-referrer-when-downgrade"
-                  ></iframe>
+                <div class="profile-mini-content-card">
+                  <p class="profile-mini-content" data-profile-mini-content>
+                    Open your panel with the actions above.
+                  </p>
                 </div>
               </div>
             </div>
@@ -202,8 +206,9 @@
 
               const titleEl = modal.querySelector("[data-profile-mini-title]");
               const metaEl = modal.querySelector("[data-profile-mini-meta]");
-              const frameEl = modal.querySelector("[data-profile-mini-embed]");
+              const contentEl = modal.querySelector("[data-profile-mini-content]");
               const openFullEl = modal.querySelector("[data-profile-mini-open-full]");
+              const openExternalEl = modal.querySelector("[data-profile-mini-open-external]");
               const closeButtons = Array.from(modal.querySelectorAll("[data-profile-mini-close]"));
 
               const closeAllPills = () => {
@@ -220,19 +225,46 @@
                 modal.classList.remove("is-open");
                 setTimeout(() => {
                   modal.hidden = true;
-                  if (frameEl) frameEl.setAttribute("src", "");
                 }, 220);
                 document.body.classList.remove("modal-open");
               };
 
               const openMini = (button) => {
+                const panel = String(button.getAttribute("data-profile-open") || "").trim().toLowerCase();
                 const src = String(button.getAttribute("data-profile-src") || "/calendar");
                 const title = String(button.getAttribute("data-profile-title") || "Panel");
                 const meta = String(button.getAttribute("data-profile-meta") || "");
                 if (titleEl) titleEl.textContent = title;
                 if (metaEl) metaEl.textContent = meta;
-                if (frameEl) frameEl.setAttribute("src", src);
-                if (openFullEl) openFullEl.setAttribute("href", src);
+                if (panel === "checkin") {
+                  if (contentEl) {
+                    contentEl.textContent =
+                      "Open CE Check-In directly to continue your sign-in and updates.";
+                  }
+                  if (openFullEl) {
+                    openFullEl.textContent = "Open Check-In Page";
+                    openFullEl.setAttribute("href", "/checkin");
+                  }
+                  if (openExternalEl) {
+                    openExternalEl.hidden = false;
+                    openExternalEl.textContent = "Open CE Check-In";
+                    openExternalEl.setAttribute("href", src);
+                  }
+                } else {
+                  if (contentEl) {
+                    contentEl.textContent =
+                      "Google Calendar may block embedded sign-in in mini panels. Use the buttons below for reliable access.";
+                  }
+                  if (openFullEl) {
+                    openFullEl.textContent = "Open Calendar Page";
+                    openFullEl.setAttribute("href", "/calendar");
+                  }
+                  if (openExternalEl) {
+                    openExternalEl.hidden = false;
+                    openExternalEl.textContent = "Open Google Calendar";
+                    openExternalEl.setAttribute("href", "https://calendar.google.com/calendar/u/0/r");
+                  }
+                }
                 modal.hidden = false;
                 document.body.classList.add("modal-open");
                 requestAnimationFrame(() => modal.classList.add("is-open"));

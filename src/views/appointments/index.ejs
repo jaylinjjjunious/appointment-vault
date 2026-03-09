@@ -46,7 +46,44 @@
       <p class="mobile-fitness-title">Appointments</p>
       <p class="mobile-fitness-date"><%= mobileDate %></p>
     </div>
-    <div class="mobile-avatar"><%= userInitial %></div>
+    <% if (safeCurrentUser) { %>
+      <div class="profile-hub" data-profile-hub>
+        <button
+          type="button"
+          class="mobile-avatar profile-trigger"
+          data-profile-trigger
+          aria-expanded="false"
+          aria-haspopup="true"
+          aria-label="Open profile controls"
+        >
+          <%= userInitial %>
+        </button>
+        <div class="profile-control-pill" data-profile-pill hidden>
+          <button
+            type="button"
+            class="profile-control-button"
+            data-profile-open="calendar"
+            data-profile-src="/calendar"
+            data-profile-title="Calendar"
+            data-profile-meta="View your calendar panel"
+          >
+            Calendar
+          </button>
+          <button
+            type="button"
+            class="profile-control-button"
+            data-profile-open="checkin"
+            data-profile-src="https://www.cecheckin.com/client/account/signin"
+            data-profile-title="Check-In"
+            data-profile-meta="Open your check-in panel"
+          >
+            Check-In
+          </button>
+        </div>
+      </div>
+    <% } else { %>
+      <div class="mobile-avatar"><%= userInitial %></div>
+    <% } %>
   </header>
 
   <nav class="mobile-pill-nav">
