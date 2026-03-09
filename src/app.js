@@ -1483,9 +1483,16 @@ app.get("/auth/google/callback", async (req, res, next) => {
   const expectedState = getOAuthStateFromSession(req);
   const stateMatchesSession = Boolean(expectedState && state && state === expectedState);
   const stateMatchesSigned = isValidSignedOAuthState(state);
+  console.log("[google-oauth] state check:", {
+    hasExpectedState: Boolean(expectedState),
+    hasIncomingState: Boolean(state),
+    stateMatchesSession,
+    stateMatchesSigned
+  });
   if (!stateMatchesSession && !stateMatchesSigned) {
     clearOAuthStateOnSession(req);
     await saveSessionAsync(req);
+    console.log("[google-oauth] state validation failed");
     res.redirect("/dashboard?google=auth_error");
     return;
   }
@@ -1529,8 +1536,13 @@ app.get("/auth/google/callback", async (req, res, next) => {
 
     req.session.userId = user.id;
     req.session.authProvider = "google";
-    persistGoogleTokens(user.id, mergedTokens);
-    assignLegacyAppointmentsToUser(user.id);
+    try {
+      persistGoogleTokens(user.id, mergedTokens);
+      assignLegacyAppointmentsToUser(user.id);
+    } catch (persistenceError) {
+      // Non-fatal: user should still be able to log in even if token persistence fails.
+      console.error("[google-oauth] post-login persistence failed:", persistenceError.message);
+    }
     console.log("[google-oauth] assigned user id:", user.id);
 
     req.session.save((sessionError) => {
@@ -1542,6 +1554,7 @@ app.get("/auth/google/callback", async (req, res, next) => {
       res.redirect("/dashboard?google=connected");
     });
   } catch (error) {
+    console.error("[google-oauth] callback error:", error?.message || error);
     if (error instanceof GoogleCalendarError) {
       res.redirect("/dashboard?google=auth_error");
       return;
