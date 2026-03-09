@@ -1517,8 +1517,9 @@ app.get("/auth/google", async (req, res, next) => {
 app.get("/auth/google/callback", async (req, res, next) => {
   const code = String(req.query.code || "");
   const state = String(req.query.state || "").trim();
+  const authErrorRedirect = "/auth/login?google=auth_error";
   if (!code) {
-    res.redirect("/dashboard?google=auth_error");
+    res.redirect(authErrorRedirect);
     return;
   }
   const expectedState = getOAuthStateFromSession(req);
@@ -1534,7 +1535,7 @@ app.get("/auth/google/callback", async (req, res, next) => {
     clearOAuthStateOnSession(req);
     await saveSessionAsync(req);
     console.log("[google-oauth] state validation failed");
-    res.redirect("/dashboard?google=auth_error");
+    res.redirect(authErrorRedirect);
     return;
   }
 
@@ -1565,7 +1566,7 @@ app.get("/auth/google/callback", async (req, res, next) => {
       source: identitySource
     });
     if (!identityFromTokens) {
-      res.redirect("/dashboard?google=auth_error");
+      res.redirect(authErrorRedirect);
       return;
     }
 
@@ -1585,7 +1586,7 @@ app.get("/auth/google/callback", async (req, res, next) => {
     }
     if (!user) {
       console.log("[google-oauth] user assignment failed");
-      res.redirect("/dashboard?google=auth_error");
+      res.redirect(authErrorRedirect);
       return;
     }
 
@@ -1604,7 +1605,7 @@ app.get("/auth/google/callback", async (req, res, next) => {
     req.session.save((sessionError) => {
       if (sessionError) {
         console.error("[google-oauth] session save failed:", sessionError.message);
-        res.redirect("/dashboard?google=auth_error");
+        res.redirect(authErrorRedirect);
         return;
       }
       console.log("[google-oauth] session save success for user id:", user.id);
@@ -1613,7 +1614,7 @@ app.get("/auth/google/callback", async (req, res, next) => {
   } catch (error) {
     console.error("[google-oauth] callback error:", error?.message || error);
     if (error instanceof GoogleCalendarError) {
-      res.redirect("/dashboard?google=auth_error");
+      res.redirect(authErrorRedirect);
       return;
     }
 

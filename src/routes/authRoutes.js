@@ -135,6 +135,15 @@ router.get("/login", csrfProtection, (req, res) => {
     res.redirect("/");
     return;
   }
+  const googleStatus = String(req.query.google || "").trim();
+  if (googleStatus === "auth_error") {
+    renderAuthPage(res, "auth/login", {
+      title: "Sign In",
+      error: "Google sign-in failed. Please try again.",
+      csrfToken: req.csrfToken()
+    });
+    return;
+  }
   res.redirect("/auth/google");
 });
 
