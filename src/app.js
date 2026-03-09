@@ -1,5 +1,6 @@
 const express = require("express");
 const session = require("express-session");
+const twilio = require("twilio");
 let SqliteStoreFactory = null;
 try {
   // Optional dependency during local/dev recovery. Falls back to memory store when missing.
@@ -154,7 +155,7 @@ const upload = multer
   : null;
 const fallbackEnv = {
   app: {
-    authRequired: false,
+    authRequired: true,
     port: Number.parseInt(String(process.env.PORT || "3000"), 10) || 3000,
     host: "0.0.0.0"
   },
@@ -174,6 +175,9 @@ const TEST_PROFILE_EMAIL =
 
 if (IS_PRODUCTION) {
   app.set("trust proxy", 1);
+  if (!SESSION_SECRET || SESSION_SECRET === "appointment-vault-session-secret-change-me") {
+    throw new Error("SESSION_SECRET must be set to a strong value in production.");
+  }
 }
 function resolveAppTimezone() {
   const candidate =
@@ -205,8 +209,6 @@ const BUILD_BRANCH =
   ).trim() || "unknown";
 const BUILD_INSTANCE =
   String(process.env.RENDER_INSTANCE_ID || process.env.HOSTNAME || "unknown").trim() || "unknown";
-const GOOGLE_TOKENS_SETTING_KEY = "google.tokens";
-const GOOGLE_PROFILE_SETTING_KEY = "google.profile";
 const LEGACY_APPOINTMENT_ASSIGNMENT_KEY = "legacy.appointments.assigned";
 const selectAppSettingStatement = db.prepare("SELECT value FROM app_settings WHERE key = ?");
 const upsertAppSettingStatement = db.prepare(`
@@ -218,6 +220,10 @@ const upsertAppSettingStatement = db.prepare(`
 `);
 const deleteAppSettingStatement = db.prepare("DELETE FROM app_settings WHERE key = ?");
 const selectUserByIdStatement = db.prepare("SELECT * FROM users WHERE id = ?");
+const selectUserGoogleTokensStatement = db.prepare("SELECT googleTokensJson FROM users WHERE id = ?");
+const updateUserGoogleTokensStatement = db.prepare(
+  "UPDATE users SET googleTokensJson = ?, updatedAt = ? WHERE id = ?"
+);
 const selectUserByProviderStatement = db.prepare(
   "SELECT * FROM users WHERE provider = ? AND providerUserId = ?"
 );
@@ -295,6 +301,7 @@ app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 app.use(
   session({
+    name: IS_PRODUCTION ? "__Host-av.sid" : "av.sid",
     secret: SESSION_SECRET,
     ...(SqliteStore
       ? {
@@ -309,11 +316,13 @@ app.use(
       : {}),
     resave: false,
     saveUninitialized: false,
+    unset: "destroy",
     proxy: IS_PRODUCTION,
     cookie: {
       httpOnly: true,
       sameSite: "lax",
       secure: IS_PRODUCTION,
+      path: "/",
       maxAge: runtimeEnv.session.maxAgeMs
     }
   })
@@ -331,13 +340,8 @@ app.use((req, res, next) => {
   next();
 });
 app.use((req, res, next) => {
-  const persistedTokens = getPersistedGoogleTokens();
-  if (!isGoogleConnected(req.session) && persistedTokens) {
-    setGoogleTokensOnSession(req.session, persistedTokens);
-  }
-
-  req.persistedGoogleTokens = persistedTokens;
-  req.persistedGoogleProfile = getPersistedGoogleProfile();
+  req.persistedGoogleTokens = null;
+  req.persistedGoogleProfile = null;
   next();
 });
 app.use((req, res, next) => {
@@ -357,11 +361,6 @@ app.use((req, res, next) => {
       req.session.userId = user.id;
     } else if (req.session?.userId) {
       user = selectUserByIdStatement.get(req.session.userId) || null;
-    }
-
-    if (!user && req.persistedGoogleProfile) {
-      user = upsertUserFromIdentity(req.persistedGoogleProfile);
-      req.session.userId = user.id;
     }
 
     if (!user && !AUTH_REQUIRED) {
@@ -388,6 +387,19 @@ app.use((req, res, next) => {
 
     req.currentUser = user || null;
     if (req.currentUser) {
+      req.persistedGoogleProfile = {
+        provider: String(req.currentUser.provider || "local").trim() || "local",
+        providerUserId: String(req.currentUser.providerUserId || "").trim(),
+        email: String(req.currentUser.email || "").trim() || null,
+        displayName: String(req.currentUser.displayName || "").trim() || null
+      };
+      if (!isGoogleConnected(req.session)) {
+        const persistedTokens = getPersistedGoogleTokens(req.currentUser.id);
+        if (persistedTokens) {
+          setGoogleTokensOnSession(req.session, persistedTokens);
+          req.persistedGoogleTokens = persistedTokens;
+        }
+      }
       assignLegacyAppointmentsToUser(req.currentUser.id);
     }
     next();
@@ -453,14 +465,18 @@ if (swaggerUi && YAML) {
   );
 }
 
-function getPersistedGoogleTokens() {
-  const row = selectAppSettingStatement.get(GOOGLE_TOKENS_SETTING_KEY);
-  if (!row?.value) {
+function getPersistedGoogleTokens(userId) {
+  const parsedUserId = Number.parseInt(String(userId || ""), 10);
+  if (!parsedUserId) {
+    return null;
+  }
+  const row = selectUserGoogleTokensStatement.get(parsedUserId);
+  if (!row?.googleTokensJson) {
     return null;
   }
 
   try {
-    const parsed = JSON.parse(row.value);
+    const parsed = JSON.parse(row.googleTokensJson);
     if (
       parsed &&
       typeof parsed === "object" &&
@@ -485,71 +501,81 @@ function mergeGoogleTokens(nextTokens, previousTokens) {
   return merged;
 }
 
-function persistGoogleTokens(tokens) {
-  const existingTokens = getPersistedGoogleTokens();
+function persistGoogleTokens(userId, tokens) {
+  const parsedUserId = Number.parseInt(String(userId || ""), 10);
+  if (!parsedUserId) {
+    return;
+  }
+  const existingTokens = getPersistedGoogleTokens(parsedUserId);
   const merged = mergeGoogleTokens(tokens, existingTokens);
   if (!merged || (!merged.access_token && !merged.refresh_token)) {
     return;
   }
 
-  upsertAppSettingStatement.run({
-    key: GOOGLE_TOKENS_SETTING_KEY,
-    value: JSON.stringify(merged),
-    updatedAt: new Date().toISOString()
-  });
+  updateUserGoogleTokensStatement.run(
+    JSON.stringify(merged),
+    new Date().toISOString(),
+    parsedUserId
+  );
 }
 
-function clearPersistedGoogleTokens() {
-  deleteAppSettingStatement.run(GOOGLE_TOKENS_SETTING_KEY);
-}
-
-function getPersistedGoogleProfile() {
-  const row = selectAppSettingStatement.get(GOOGLE_PROFILE_SETTING_KEY);
-  if (!row?.value) {
-    return null;
+function clearPersistedGoogleTokens(userId) {
+  const parsedUserId = Number.parseInt(String(userId || ""), 10);
+  if (!parsedUserId) {
+    return;
   }
-
-  try {
-    const parsed = JSON.parse(row.value);
-    if (
-      parsed &&
-      typeof parsed === "object" &&
-      String(parsed.providerUserId || "").trim()
-    ) {
-      return {
-        provider: String(parsed.provider || "google").trim() || "google",
-        providerUserId: String(parsed.providerUserId || "").trim(),
-        email: String(parsed.email || "").trim() || null,
-        displayName: String(parsed.displayName || "").trim() || null
-      };
-    }
-  } catch (error) {
-    console.error("Failed to parse persisted Google profile:", error.message);
-  }
-
-  return null;
+  updateUserGoogleTokensStatement.run(null, new Date().toISOString(), parsedUserId);
 }
 
-function persistGoogleProfile(profile) {
-  if (!profile || !String(profile.providerUserId || "").trim()) {
+function getOAuthStateFromSession(req) {
+  return String(req.session?.googleOAuthState || "").trim();
+}
+
+function setOAuthStateOnSession(req, state) {
+  if (req.session) {
+    req.session.googleOAuthState = String(state || "").trim();
+  }
+}
+
+function clearOAuthStateOnSession(req) {
+  if (req.session?.googleOAuthState) {
+    delete req.session.googleOAuthState;
+  }
+}
+
+function getBestExternalUrl(req) {
+  const explicitBaseUrl = String(process.env.PUBLIC_BASE_URL || "").trim();
+  if (explicitBaseUrl) {
+    return explicitBaseUrl.replace(/\/+$/, "");
+  }
+  const protocol =
+    String(req.get("x-forwarded-proto") || "").trim() ||
+    req.protocol ||
+    "http";
+  const host = String(req.get("x-forwarded-host") || req.get("host") || "").trim();
+  return `${protocol}://${host}`;
+}
+
+function requireTwilioSignature(req, res, next) {
+  const authToken = String(process.env.TWILIO_AUTH_TOKEN || "").trim();
+  if (!authToken) {
+    next();
+    return;
+  }
+  const signature = String(req.get("x-twilio-signature") || "").trim();
+  if (!signature) {
+    res.status(401).type("text/plain").send("Missing Twilio signature.");
     return;
   }
 
-  const nowIso = new Date().toISOString();
-  upsertAppSettingStatement.run({
-    key: GOOGLE_PROFILE_SETTING_KEY,
-    value: JSON.stringify({
-      provider: String(profile.provider || "google").trim() || "google",
-      providerUserId: String(profile.providerUserId || "").trim(),
-      email: String(profile.email || "").trim() || null,
-      displayName: String(profile.displayName || "").trim() || null
-    }),
-    updatedAt: nowIso
-  });
-}
-
-function clearPersistedGoogleProfile() {
-  deleteAppSettingStatement.run(GOOGLE_PROFILE_SETTING_KEY);
+  const requestUrl = `${getBestExternalUrl(req)}${req.originalUrl}`;
+  const params = req.body && typeof req.body === "object" ? req.body : {};
+  const valid = twilio.validateRequest(authToken, signature, requestUrl, params);
+  if (!valid) {
+    res.status(401).type("text/plain").send("Invalid Twilio signature.");
+    return;
+  }
+  next();
 }
 
 function normalizeIdentity(identity) {
@@ -1335,7 +1361,9 @@ app.get("/auth/google", (req, res, next) => {
   }
 
   try {
-    res.redirect(getGoogleAuthUrl());
+    const state = randomUUID();
+    setOAuthStateOnSession(req, state);
+    res.redirect(getGoogleAuthUrl(state));
   } catch (error) {
     next(error);
   }
@@ -1343,22 +1371,29 @@ app.get("/auth/google", (req, res, next) => {
 
 app.get("/auth/google/callback", async (req, res, next) => {
   const code = String(req.query.code || "");
+  const state = String(req.query.state || "").trim();
   if (!code) {
+    res.redirect("/dashboard?google=auth_error");
+    return;
+  }
+  const expectedState = getOAuthStateFromSession(req);
+  if (!expectedState || !state || state !== expectedState) {
+    clearOAuthStateOnSession(req);
     res.redirect("/dashboard?google=auth_error");
     return;
   }
 
   try {
+    clearOAuthStateOnSession(req);
     const tokens = await exchangeCodeForTokens(code);
-    const mergedTokens = mergeGoogleTokens(tokens, getPersistedGoogleTokens());
+    const mergedTokens = mergeGoogleTokens(tokens, req.session?.googleTokens || null);
     setGoogleTokensOnSession(req.session, mergedTokens);
-    persistGoogleTokens(mergedTokens);
     const identityFromTokens = extractGoogleIdentityFromTokens(mergedTokens);
     if (identityFromTokens) {
       const user = upsertUserFromIdentity(identityFromTokens);
       if (user) {
         req.session.userId = user.id;
-        persistGoogleProfile(identityFromTokens);
+        persistGoogleTokens(user.id, mergedTokens);
         assignLegacyAppointmentsToUser(user.id);
       }
     }
@@ -1380,8 +1415,9 @@ app.post("/auth/google/disconnect", (req, res) => {
   }
 
   clearGoogleSession(req.session);
-  clearPersistedGoogleTokens();
-  clearPersistedGoogleProfile();
+  if (req.currentUser?.id) {
+    clearPersistedGoogleTokens(req.currentUser.id);
+  }
   if (req.session?.userId) {
     delete req.session.userId;
   }
@@ -1404,7 +1440,7 @@ app.get("/version", (req, res) => {
   });
 });
 
-app.post("/twilio/voice", (req, res) => {
+app.post("/twilio/voice", requireTwilioSignature, (req, res) => {
   const VoiceResponse = require("twilio").twiml.VoiceResponse;
   const twiml = new VoiceResponse();
   const requestedId = parseId(req.query.appointmentId || req.body.appointmentId);
@@ -1415,7 +1451,7 @@ app.post("/twilio/voice", (req, res) => {
   res.send(twiml.toString());
 });
 
-app.post("/twilio/status-callback", (req, res) => {
+app.post("/twilio/status-callback", requireTwilioSignature, (req, res) => {
   const result = handleVoiceStatusCallback({
     attemptId: req.query.attemptId || req.body.attemptId,
     callSid: req.body.CallSid || req.body.callSid,
@@ -1427,13 +1463,17 @@ app.post("/twilio/status-callback", (req, res) => {
   res.status(result.ok ? 200 : 404).type("text/plain").send(result.ok ? "OK" : "NOT_FOUND");
 });
 
-app.get("/twilio/test-call", async (req, res) => {
+app.get("/twilio/test-call", (req, res) => {
+  res.status(405).json({ ok: false, message: "Use POST /api/reminders/test or POST /settings/test-call." });
+});
+
+app.post("/twilio/test-call", async (req, res) => {
   const user = requireCurrentUser(req, res);
   if (!user) {
     return;
   }
 
-  const minutesRaw = Number.parseInt(String(req.query.minutes || "30"), 10);
+  const minutesRaw = Number.parseInt(String(req.body.minutes || req.query.minutes || "30"), 10);
   const minutesOffset = [30, 60].includes(minutesRaw) ? minutesRaw : null;
   if (!minutesOffset) {
     res.status(400).json({
@@ -1443,7 +1483,7 @@ app.get("/twilio/test-call", async (req, res) => {
     return;
   }
 
-  const requestedId = parseId(req.query.appointmentId);
+  const requestedId = parseId(req.body.appointmentId || req.query.appointmentId);
   const appointment = getUpcomingAppointmentForCall(requestedId, user.id);
   const targetAppointmentId = appointment?.id ?? null;
 
@@ -1693,10 +1733,7 @@ app.get("/dashboard", async (req, res) => {
       googleStatusMessage,
       todoStatusMessage,
       todoItems,
-      calendarEmbedUrl: buildGoogleCalendarEmbedUrl(
-        String(user.email || req.persistedGoogleProfile?.email || "primary").trim() || "primary",
-        user.timezone || APP_TIMEZONE
-      )
+      calendarEmbedUrl: buildGoogleCalendarEmbedUrl("primary", user.timezone || APP_TIMEZONE)
     });
   } catch (error) {
     console.error("Home page load failed:", error.message);
@@ -1755,10 +1792,7 @@ app.get("/appointments", async (req, res) => {
       ...dashboardData,
       todoStatusMessage,
       todoItems,
-      calendarEmbedUrl: buildGoogleCalendarEmbedUrl(
-        String(user.email || req.persistedGoogleProfile?.email || "primary").trim() || "primary",
-        user.timezone || APP_TIMEZONE
-      )
+      calendarEmbedUrl: buildGoogleCalendarEmbedUrl("primary", user.timezone || APP_TIMEZONE)
     });
   } catch (error) {
     console.error("Appointments list load failed:", error.message);
@@ -1787,7 +1821,7 @@ app.post("/dashboard/todo", async (req, res) => {
       startDate,
       durationMinutes
     });
-    persistGoogleTokens(req.session?.googleTokens);
+    persistGoogleTokens(user.id, req.session?.googleTokens);
     res.redirect("/appointments?todo=created");
   } catch (error) {
     if (error instanceof GoogleCalendarError) {
@@ -1810,7 +1844,7 @@ app.post("/dashboard/todo/complete", async (req, res) => {
       todoEventId: req.body?.todoEventId,
       syncId: req.body?.todoSyncId
     });
-    persistGoogleTokens(req.session?.googleTokens);
+    persistGoogleTokens(user.id, req.session?.googleTokens);
     res.redirect("/appointments?todo=completed");
   } catch (error) {
     console.error("To-Do completion failed:", error.message);
@@ -1947,11 +1981,9 @@ app.get("/calendar", (req, res) => {
     return;
   }
 
-  const profile = req.persistedGoogleProfile || null;
-  const calendarId = String(user.email || profile?.email || "primary").trim() || "primary";
   res.render("calendar", {
     title: "Calendar",
-    calendarEmbedUrl: buildGoogleCalendarEmbedUrl(calendarId, user.timezone || APP_TIMEZONE),
+    calendarEmbedUrl: buildGoogleCalendarEmbedUrl("primary", user.timezone || APP_TIMEZONE),
     checkinDocuments: selectCheckinDocumentsStatement.all(user.id),
     checkinDocStatus: String(req.query.doc || ""),
     checkinUploadAvailable: Boolean(upload)
@@ -2428,7 +2460,7 @@ app.post("/agent/save", async (req, res, next) => {
                WHERE id = ? AND userId = ?`
             ).run(googleEventId, new Date().toISOString(), Number(insertInfo.lastInsertRowid), user.id);
           }
-          persistGoogleTokens(req.session.googleTokens);
+          persistGoogleTokens(user.id, req.session.googleTokens);
         }
       }
     } catch (error) {
@@ -2500,6 +2532,13 @@ app.post("/api/assistant/calendar", async (req, res, next) => {
       res.status(400).json({
         ok: false,
         message: "Assistant returned invalid date/time. Please try again."
+      });
+      return;
+    }
+    if (endDate <= startDate) {
+      res.status(400).json({
+        ok: false,
+        message: "Assistant returned an invalid time range (end must be after start)."
       });
       return;
     }
@@ -2628,9 +2667,6 @@ app.post("/api/actions/appointments", async (req, res, next) => {
       : "";
 
     if (!expectedToken || !receivedToken || receivedToken !== expectedToken) {
-      console.log("EXPECTED_TOKEN_SET:", Boolean(process.env.ACTION_API_TOKEN));
-      console.log("AUTH_HEADER:", req.headers.authorization);
-      console.log("PARSED_TOKEN_PRESENT:", Boolean(receivedToken));
       res.status(401).json({ error: "Unauthorized" });
       return;
     }
@@ -2650,6 +2686,13 @@ app.post("/api/actions/appointments", async (req, res, next) => {
     if (!startIso || !isValidIsoDateTime(startIso)) errors.start = "Start must be ISO 8601.";
     if (!endIso || !isValidIsoDateTime(endIso)) errors.end = "End must be ISO 8601.";
     if (!timezone) errors.timezone = "Timezone is required.";
+    if (isValidIsoDateTime(startIso) && isValidIsoDateTime(endIso)) {
+      const startDate = new Date(startIso);
+      const endDate = new Date(endIso);
+      if (endDate <= startDate) {
+        errors.end = "End must be after start.";
+      }
+    }
 
     if (Object.keys(errors).length > 0) {
       res.status(400).json({ ok: false, message: "Invalid input.", errors });
@@ -2866,7 +2909,7 @@ app.post("/appointments", async (req, res, next) => {
                WHERE id = ? AND userId = ?`
             ).run(googleEventId, new Date().toISOString(), Number(insertInfo.lastInsertRowid), user.id);
           }
-          persistGoogleTokens(req.session.googleTokens);
+          persistGoogleTokens(user.id, req.session.googleTokens);
         }
       }
     } catch (error) {
@@ -3271,6 +3314,16 @@ app.use(errorHandler);
 
 logTwilioEnvStatus();
 startReminderScheduler();
+
+if (!global.__APPOINTMENT_VAULT_PROCESS_GUARDS_INSTALLED__) {
+  process.on("unhandledRejection", (reason) => {
+    console.error("[process] Unhandled promise rejection:", reason);
+  });
+  process.on("uncaughtException", (error) => {
+    console.error("[process] Uncaught exception:", error);
+  });
+  global.__APPOINTMENT_VAULT_PROCESS_GUARDS_INSTALLED__ = true;
+}
 
 if (require.main === module) {
   app.listen(runtimeEnv.app.port, runtimeEnv.app.host, () => {
