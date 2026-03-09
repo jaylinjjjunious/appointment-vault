@@ -305,12 +305,33 @@ const selectAppointmentsForUserStatement = db.prepare(
    ORDER BY date ASC, time ASC, id ASC`
 );
 
+function buildAuthDebugSnapshot(req, res) {
+  return {
+    method: req.method || "",
+    path: req.path || "",
+    sessionId: req.sessionID || null,
+    sessionUserId: req.session?.userId || null,
+    currentUserId: req.currentUser?.id || null,
+    cookieHeader: String(req.headers.cookie || ""),
+    secure: Boolean(req.secure),
+    protocol: String(req.protocol || ""),
+    xForwardedProto: String(req.get("x-forwarded-proto") || ""),
+    setCookieHeader: res?.getHeader ? res.getHeader("set-cookie") || null : null
+  };
+}
+
 app.set("view engine", "ejs");
 app.set("views", path.join(__dirname, "views"));
 
 app.use(requestContext);
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
+app.use((req, res, next) => {
+  if (req.path.startsWith("/auth") || req.path === "/dashboard") {
+    console.log("[auth-debug] before-session", buildAuthDebugSnapshot(req, res));
+  }
+  next();
+});
 app.use(
   session({
     name: IS_PRODUCTION ? "__Host-av.sid" : "av.sid",
@@ -339,6 +360,12 @@ app.use(
     }
   })
 );
+app.use((req, res, next) => {
+  if (req.path.startsWith("/auth") || req.path === "/dashboard") {
+    console.log("[auth-debug] after-session", buildAuthDebugSnapshot(req, res));
+  }
+  next();
+});
 installSecurity(app);
 app.use((req, res, next) => {
   if (TEST_PROFILE_ENABLED) {
@@ -450,13 +477,7 @@ app.use((req, res, next) => {
     return;
   }
 
-  console.log("[auth-guard] redirecting to /auth/login", {
-    path: req.path,
-    sessionId: req.sessionID || null,
-    sessionUserId: req.session?.userId || null,
-    hasCurrentUser: Boolean(req.currentUser),
-    cookieHeader: String(req.headers.cookie || "")
-  });
+  console.log("[auth-guard] redirecting to /auth/login", buildAuthDebugSnapshot(req, res));
 
   if (isApiPath) {
     res.status(401).json({ ok: false, message: "Authentication required." });
@@ -1578,12 +1599,7 @@ app.get("/auth/google/callback", async (req, res, next) => {
       console.error("[google-oauth] post-login persistence failed:", persistenceError.message);
     }
     console.log("[google-oauth] resolved user id:", user.id);
-    console.log("[google-oauth] callback session snapshot:", {
-      sessionId: req.sessionID || null,
-      sessionUserId: req.session?.userId || null,
-      hasCurrentUser: Boolean(req.currentUser),
-      cookieHeader: String(req.headers.cookie || "")
-    });
+    console.log("[google-oauth] callback session snapshot:", buildAuthDebugSnapshot(req, res));
 
     req.session.save((sessionError) => {
       if (sessionError) {
@@ -1852,19 +1868,9 @@ app.get("/", (req, res) => {
 });
 
 app.get("/dashboard", async (req, res) => {
-  console.log("[dashboard] session snapshot:", {
-    sessionId: req.sessionID || null,
-    sessionUserId: req.session?.userId || null,
-    hasCurrentUser: Boolean(req.currentUser),
-    cookieHeader: String(req.headers.cookie || "")
-  });
+  console.log("[dashboard] session snapshot:", buildAuthDebugSnapshot(req, res));
   if (String(req.session?.authProvider || "").trim() === "local") {
-    console.log("[auth-local] dashboard session snapshot:", {
-      sessionId: req.sessionID || null,
-      sessionUserId: req.session?.userId || null,
-      hasCurrentUser: Boolean(req.currentUser),
-      cookieHeader: String(req.headers.cookie || "")
-    });
+    console.log("[auth-local] dashboard session snapshot:", buildAuthDebugSnapshot(req, res));
   }
   const user = requireCurrentUser(req, res);
   if (!user) {

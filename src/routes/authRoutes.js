@@ -1,10 +1,125 @@
 const express = require("express");
 const csurf = require("csurf");
+const rateLimit = require("express-rate-limit");
 const { registerSchema, loginSchema } = require("../validation/authSchemas");
 const { registerLocalUser, authenticateLocalUser } = require("../services/authService");
 
 const router = express.Router();
 const csrfProtection = csurf();
+
+function buildAuthDebugSnapshot(req, res) {
+  return {
+    method: req.method || "",
+    path: req.path || "",
+    sessionId: req.sessionID || null,
+    sessionUserId: req.session?.userId || null,
+    currentUserId: req.currentUser?.id || null,
+    cookieHeader: String(req.headers.cookie || ""),
+    secure: Boolean(req.secure),
+    protocol: String(req.protocol || ""),
+    xForwardedProto: String(req.get("x-forwarded-proto") || ""),
+    setCookieHeader: res?.getHeader ? res.getHeader("set-cookie") || null : null
+  };
+}
+
+function authRateLimitHandler(req, res, message = "Too many attempts. Please try again later.") {
+  const acceptsHtml = String(req.get("accept") || "").includes("text/html");
+  if (!acceptsHtml) {
+    res.status(429).json({ ok: false, message });
+    return;
+  }
+  const view = req.path.includes("register") ? "auth/register" : "auth/login";
+  const title = view === "auth/register" ? "Create Account" : "Sign In";
+  renderAuthPage(res.status(429), view, {
+    title,
+    error: message,
+    values: {
+      email: String(req.body?.email || ""),
+      displayName: String(req.body?.displayName || "")
+    },
+    csrfToken: ""
+  });
+}
+
+const loginIpLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  skipSuccessfulRequests: true,
+  handler: (req, res) =>
+    authRateLimitHandler(req, res, "Too many login attempts from this network. Please wait 15 minutes.")
+});
+
+const loginEmailLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 8,
+  standardHeaders: true,
+  legacyHeaders: false,
+  skipSuccessfulRequests: true,
+  keyGenerator: (req) => {
+    const email = String(req.body?.email || "").trim().toLowerCase();
+    return `${req.ip}:${email || "unknown"}`;
+  },
+  handler: (req, res) =>
+    authRateLimitHandler(req, res, "Too many login attempts for this account. Please wait 15 minutes.")
+});
+
+const registerLimiter = rateLimit({
+  windowMs: 30 * 60 * 1000,
+  max: 6,
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: (req, res) =>
+    authRateLimitHandler(req, res, "Too many registration attempts. Please wait before trying again.")
+});
+
+function ensureSameOrigin(req, res, next) {
+  const origin = String(req.get("origin") || "").trim();
+  const referer = String(req.get("referer") || "").trim();
+  const host = String(req.get("host") || "").trim().toLowerCase();
+  const headerToCheck = origin || referer;
+  if (!headerToCheck) {
+    res.status(403).send("Forbidden");
+    return;
+  }
+  try {
+    const parsed = new URL(headerToCheck);
+    if (String(parsed.host || "").toLowerCase() !== host) {
+      res.status(403).send("Forbidden");
+      return;
+    }
+  } catch (error) {
+    res.status(403).send("Forbidden");
+    return;
+  }
+  next();
+}
+
+function createSessionForUser(req, user, provider, callback) {
+  req.session.regenerate((error) => {
+    if (error) {
+      callback(error);
+      return;
+    }
+    req.session.userId = user.id;
+    req.session.authProvider = provider;
+    req.session.authenticatedAt = new Date().toISOString();
+    req.session.save(callback);
+  });
+}
+
+function createSessionForUserAsync(req, user, provider) {
+  return new Promise((resolve, reject) => {
+    createSessionForUser(req, user, provider, (error) => {
+      if (error) {
+        reject(error);
+        return;
+      }
+      resolve();
+    });
+  });
+}
 
 function renderAuthPage(res, view, model = {}) {
   return res.render(view, {
@@ -26,7 +141,7 @@ router.get("/login", csrfProtection, (req, res) => {
   });
 });
 
-router.post("/login", csrfProtection, async (req, res, next) => {
+router.post("/login", loginIpLimiter, loginEmailLimiter, csrfProtection, async (req, res, next) => {
   try {
     const parsed = loginSchema.safeParse(req.body || {});
     if (!parsed.success) {
@@ -50,8 +165,8 @@ router.post("/login", csrfProtection, async (req, res, next) => {
       return;
     }
 
-    req.session.userId = user.id;
-    req.session.authProvider = "local";
+    await createSessionForUserAsync(req, user, "local");
+    console.log("[auth-local] login success snapshot:", buildAuthDebugSnapshot(req, res));
     res.redirect("/");
   } catch (error) {
     next(error);
@@ -69,13 +184,14 @@ router.get("/register", csrfProtection, (req, res) => {
   });
 });
 
-router.post("/register", csrfProtection, async (req, res, next) => {
+router.post("/register", registerLimiter, csrfProtection, async (req, res, next) => {
   try {
     const parsed = registerSchema.safeParse(req.body || {});
     if (!parsed.success) {
       renderAuthPage(res.status(400), "auth/register", {
         title: "Create Account",
-        error: "Please enter a valid email and a password of at least 8 characters.",
+        error:
+          "Please enter a valid email and a strong password (12+ chars, upper, lower, number, special).",
         values: {
           email: String(req.body?.email || ""),
           displayName: String(req.body?.displayName || "")
@@ -86,8 +202,7 @@ router.post("/register", csrfProtection, async (req, res, next) => {
     }
 
     const user = await registerLocalUser(parsed.data);
-    req.session.userId = user.id;
-    req.session.authProvider = "local";
+    await createSessionForUserAsync(req, user, "local");
     res.redirect("/");
   } catch (error) {
     renderAuthPage(res.status(error.statusCode || 400), "auth/register", {
@@ -102,9 +217,31 @@ router.post("/register", csrfProtection, async (req, res, next) => {
   }
 });
 
-router.post("/logout", (req, res) => {
+router.post("/logout", ensureSameOrigin, (req, res) => {
   req.session.destroy(() => {
+    res.clearCookie("connect.sid");
+    res.clearCookie("av.sid");
+    res.clearCookie("__Host-av.sid", { path: "/" });
     res.redirect("/auth/login");
+  });
+});
+
+router.use((error, req, res, next) => {
+  if (error?.code !== "EBADCSRFTOKEN") {
+    next(error);
+    return;
+  }
+  const view = req.path.includes("register") ? "auth/register" : "auth/login";
+  const title = view === "auth/register" ? "Create Account" : "Sign In";
+  const values = {
+    email: String(req.body?.email || ""),
+    displayName: String(req.body?.displayName || "")
+  };
+  renderAuthPage(res.status(403), view, {
+    title,
+    error: "Your form expired. Please try again.",
+    values,
+    csrfToken: req.csrfToken ? req.csrfToken() : ""
   });
 });
 
