@@ -1506,8 +1506,23 @@ app.get("/auth/google/callback", async (req, res, next) => {
     console.log("[google-oauth] token exchange success:", hasTokens);
     const mergedTokens = mergeGoogleTokens(tokens, req.session?.googleTokens || null);
     setGoogleTokensOnSession(req.session, mergedTokens);
-    const identityFromTokens = extractGoogleIdentityFromTokens(mergedTokens);
-    console.log("[google-oauth] identity extracted:", Boolean(identityFromTokens));
+    const hasIdToken = Boolean(String(mergedTokens?.id_token || "").trim());
+    let identitySource = "none";
+    const extractedIdentity = extractGoogleIdentityFromTokens(mergedTokens);
+    let identityFromTokens = extractedIdentity;
+    if (identityFromTokens) {
+      identitySource = "id_token";
+    } else {
+      identityFromTokens = await _resolveIdentityFromGoogleTokens(mergedTokens);
+      if (identityFromTokens) {
+        identitySource = "userinfo";
+      }
+    }
+    console.log("[google-oauth] id_token present:", hasIdToken);
+    console.log("[google-oauth] identity resolved:", {
+      ok: Boolean(identityFromTokens),
+      source: identitySource
+    });
     if (!identityFromTokens) {
       res.redirect("/dashboard?google=auth_error");
       return;
@@ -1542,7 +1557,7 @@ app.get("/auth/google/callback", async (req, res, next) => {
       // Non-fatal: user should still be able to log in even if token persistence fails.
       console.error("[google-oauth] post-login persistence failed:", persistenceError.message);
     }
-    console.log("[google-oauth] assigned user id:", user.id);
+    console.log("[google-oauth] resolved user id:", user.id);
     console.log("[google-oauth] callback session snapshot:", {
       sessionId: req.sessionID || null,
       sessionUserId: req.session?.userId || null,
