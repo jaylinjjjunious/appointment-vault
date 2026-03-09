@@ -18,7 +18,7 @@ try {
   YAML = null;
 }
 const path = require("node:path");
-const { randomUUID } = require("node:crypto");
+const { randomUUID, createHmac, timingSafeEqual } = require("node:crypto");
 let multer = null;
 try {
   multer = require("multer");
@@ -552,6 +552,42 @@ function clearOAuthStateOnSession(req) {
   if (req.session?.googleOAuthState) {
     delete req.session.googleOAuthState;
   }
+}
+
+function createSignedOAuthState() {
+  const nonce = randomUUID();
+  const timestamp = Date.now();
+  const payload = `${nonce}.${timestamp}`;
+  const signature = createHmac("sha256", SESSION_SECRET).update(payload).digest("base64url");
+  return `${payload}.${signature}`;
+}
+
+function isValidSignedOAuthState(value) {
+  const raw = String(value || "").trim();
+  if (!raw) {
+    return false;
+  }
+  const parts = raw.split(".");
+  if (parts.length !== 3) {
+    return false;
+  }
+  const [nonce, issuedAtRaw, signature] = parts;
+  const payload = `${nonce}.${issuedAtRaw}`;
+  const expected = createHmac("sha256", SESSION_SECRET).update(payload).digest("base64url");
+  const providedBuffer = Buffer.from(signature);
+  const expectedBuffer = Buffer.from(expected);
+  if (providedBuffer.length !== expectedBuffer.length) {
+    return false;
+  }
+  if (!timingSafeEqual(providedBuffer, expectedBuffer)) {
+    return false;
+  }
+  const issuedAt = Number.parseInt(issuedAtRaw, 10);
+  if (!Number.isFinite(issuedAt)) {
+    return false;
+  }
+  const maxAgeMs = 10 * 60 * 1000;
+  return Date.now() - issuedAt >= 0 && Date.now() - issuedAt <= maxAgeMs;
 }
 
 async function resolveIdentityFromGoogleTokens(tokens) {
@@ -1427,7 +1463,7 @@ app.get("/auth/google", async (req, res, next) => {
   }
 
   try {
-    const state = randomUUID();
+    const state = createSignedOAuthState();
     setOAuthStateOnSession(req, state);
     await saveSessionAsync(req);
     res.redirect(getGoogleAuthUrl(state));
@@ -1444,7 +1480,9 @@ app.get("/auth/google/callback", async (req, res, next) => {
     return;
   }
   const expectedState = getOAuthStateFromSession(req);
-  if (!expectedState || !state || state !== expectedState) {
+  const stateMatchesSession = Boolean(expectedState && state && state === expectedState);
+  const stateMatchesSigned = isValidSignedOAuthState(state);
+  if (!stateMatchesSession && !stateMatchesSigned) {
     clearOAuthStateOnSession(req);
     await saveSessionAsync(req);
     res.redirect("/dashboard?google=auth_error");
