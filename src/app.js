@@ -231,6 +231,7 @@ const upsertAppSettingStatement = db.prepare(`
 `);
 const deleteAppSettingStatement = db.prepare("DELETE FROM app_settings WHERE key = ?");
 const selectUserByIdStatement = db.prepare("SELECT * FROM users WHERE id = ?");
+const selectUserByEmailStatement = db.prepare("SELECT * FROM users WHERE LOWER(email) = LOWER(?) LIMIT 1");
 const selectUserGoogleTokensStatement = db.prepare("SELECT googleTokensJson FROM users WHERE id = ?");
 const updateUserGoogleTokensStatement = db.prepare(
   "UPDATE users SET googleTokensJson = ?, updatedAt = ? WHERE id = ?"
@@ -1498,14 +1499,28 @@ app.get("/auth/google/callback", async (req, res, next) => {
     console.log("[google-oauth] tokens received:", hasTokens);
     const mergedTokens = mergeGoogleTokens(tokens, req.session?.googleTokens || null);
     setGoogleTokensOnSession(req.session, mergedTokens);
-    const identityFromTokens = extractGoogleIdentityFromTokens(mergedTokens);
+    const extractedIdentity = extractGoogleIdentityFromTokens(mergedTokens);
+    const identityFromTokens = extractedIdentity || (await resolveIdentityFromGoogleTokens(mergedTokens));
     console.log("[google-oauth] identity extracted:", Boolean(identityFromTokens));
     if (!identityFromTokens) {
       res.redirect("/dashboard?google=auth_error");
       return;
     }
 
-    const user = upsertUserFromIdentity(identityFromTokens);
+    let user = null;
+    try {
+      user = upsertUserFromIdentity(identityFromTokens);
+    } catch (upsertError) {
+      const email = String(identityFromTokens.email || "").trim();
+      const isEmailConflict =
+        String(upsertError?.code || "").includes("SQLITE_CONSTRAINT") &&
+        String(upsertError?.message || "").toLowerCase().includes("users.email");
+      if (isEmailConflict && email) {
+        user = selectUserByEmailStatement.get(email) || null;
+      } else {
+        throw upsertError;
+      }
+    }
     if (!user) {
       console.log("[google-oauth] user assignment failed");
       res.redirect("/dashboard?google=auth_error");
