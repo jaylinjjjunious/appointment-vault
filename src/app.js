@@ -174,7 +174,7 @@ const TEST_PROFILE_EMAIL =
   String(process.env.TEST_PROFILE_EMAIL || "").trim() || "test-profile@appointment-vault.local";
 
 if (IS_PRODUCTION) {
-  app.set("trust proxy", true);
+  app.set("trust proxy", 1);
   if (!SESSION_SECRET || SESSION_SECRET === "appointment-vault-session-secret-change-me") {
     throw new Error("SESSION_SECRET must be set to a strong value in production.");
   }
@@ -437,6 +437,14 @@ app.use((req, res, next) => {
     next();
     return;
   }
+
+  console.log("[auth-guard] redirecting to /auth/login", {
+    path: req.path,
+    sessionId: req.sessionID || null,
+    sessionUserId: req.session?.userId || null,
+    hasCurrentUser: Boolean(req.currentUser),
+    cookieHeader: String(req.headers.cookie || "")
+  });
 
   if (isApiPath) {
     res.status(401).json({ ok: false, message: "Authentication required." });
@@ -1561,7 +1569,8 @@ app.get("/auth/google/callback", async (req, res, next) => {
     console.log("[google-oauth] callback session snapshot:", {
       sessionId: req.sessionID || null,
       sessionUserId: req.session?.userId || null,
-      hasCurrentUser: Boolean(req.currentUser)
+      hasCurrentUser: Boolean(req.currentUser),
+      cookieHeader: String(req.headers.cookie || "")
     });
 
     req.session.save((sessionError) => {
@@ -1834,8 +1843,17 @@ app.get("/dashboard", async (req, res) => {
   console.log("[dashboard] session snapshot:", {
     sessionId: req.sessionID || null,
     sessionUserId: req.session?.userId || null,
-    hasCurrentUser: Boolean(req.currentUser)
+    hasCurrentUser: Boolean(req.currentUser),
+    cookieHeader: String(req.headers.cookie || "")
   });
+  if (String(req.session?.authProvider || "").trim() === "local") {
+    console.log("[auth-local] dashboard session snapshot:", {
+      sessionId: req.sessionID || null,
+      sessionUserId: req.session?.userId || null,
+      hasCurrentUser: Boolean(req.currentUser),
+      cookieHeader: String(req.headers.cookie || "")
+    });
+  }
   const user = requireCurrentUser(req, res);
   if (!user) {
     return;
