@@ -331,7 +331,7 @@ app.use(
     proxy: IS_PRODUCTION,
     cookie: {
       httpOnly: true,
-      sameSite: "lax",
+      sameSite: IS_PRODUCTION ? "none" : "lax",
       secure: IS_PRODUCTION,
       path: "/",
       maxAge: runtimeEnv.session.maxAgeMs
