@@ -173,48 +173,12 @@ router.post("/login", loginIpLimiter, loginEmailLimiter, csrfProtection, async (
   }
 });
 
-router.get("/register", csrfProtection, (req, res) => {
-  if (req.currentUser) {
-    res.redirect("/");
-    return;
-  }
-  renderAuthPage(res, "auth/register", {
-    title: "Create Account",
-    csrfToken: req.csrfToken()
-  });
+router.get("/register", (req, res) => {
+  res.redirect("/auth/login");
 });
 
-router.post("/register", registerLimiter, csrfProtection, async (req, res, next) => {
-  try {
-    const parsed = registerSchema.safeParse(req.body || {});
-    if (!parsed.success) {
-      renderAuthPage(res.status(400), "auth/register", {
-        title: "Create Account",
-        error:
-          "Please enter a valid email and a strong password (12+ chars, upper, lower, number, special).",
-        values: {
-          email: String(req.body?.email || ""),
-          displayName: String(req.body?.displayName || "")
-        },
-        csrfToken: req.csrfToken()
-      });
-      return;
-    }
-
-    const user = await registerLocalUser(parsed.data);
-    await createSessionForUserAsync(req, user, "local");
-    res.redirect("/");
-  } catch (error) {
-    renderAuthPage(res.status(error.statusCode || 400), "auth/register", {
-      title: "Create Account",
-      error: error.publicMessage || error.message || "Unable to create account.",
-      values: {
-        email: String(req.body?.email || ""),
-        displayName: String(req.body?.displayName || "")
-      },
-      csrfToken: req.csrfToken ? req.csrfToken() : ""
-    });
-  }
+router.post("/register", (req, res) => {
+  res.redirect("/auth/login");
 });
 
 router.post("/logout", ensureSameOrigin, (req, res) => {
