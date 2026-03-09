@@ -1973,7 +1973,9 @@ app.get("/checkin", (req, res) => {
     return;
   }
 
-  res.redirect("/calendar#checkin");
+  res.render("checkin", {
+    title: "Check-In"
+  });
 });
 app.get("/calendar", (req, res) => {
   const user = requireCurrentUser(req, res);

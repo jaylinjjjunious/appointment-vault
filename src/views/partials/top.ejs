@@ -147,7 +147,7 @@
                     type="button"
                     class="profile-control-button"
                     data-profile-open="checkin"
-                    data-profile-src="https://www.cecheckin.com/client/account/signin"
+                    data-profile-src="/checkin"
                     data-profile-title="Check-In"
                     data-profile-meta="Open your check-in panel"
                   >
@@ -243,12 +243,12 @@
                   }
                   if (openFullEl) {
                     openFullEl.textContent = "Open Check-In Page";
-                    openFullEl.setAttribute("href", "/checkin");
+                    openFullEl.setAttribute("href", src);
                   }
                   if (openExternalEl) {
                     openExternalEl.hidden = false;
                     openExternalEl.textContent = "Open CE Check-In";
-                    openExternalEl.setAttribute("href", src);
+                    openExternalEl.setAttribute("href", "https://www.cecheckin.com/client/account/signin");
                   }
                 } else {
                   if (contentEl) {
