@@ -554,6 +554,22 @@ function clearOAuthStateOnSession(req) {
   }
 }
 
+function saveSessionAsync(req) {
+  return new Promise((resolve, reject) => {
+    if (!req.session) {
+      resolve();
+      return;
+    }
+    req.session.save((error) => {
+      if (error) {
+        reject(error);
+        return;
+      }
+      resolve();
+    });
+  });
+}
+
 function getBestExternalUrl(req) {
   const explicitBaseUrl = String(process.env.PUBLIC_BASE_URL || "").trim();
   if (explicitBaseUrl) {
@@ -1356,7 +1372,7 @@ function buildTodayVoiceMessage(userId, requestedAppointmentId, now = new Date()
   return message;
 }
 
-app.get("/auth/google", (req, res, next) => {
+app.get("/auth/google", async (req, res, next) => {
   if (TEST_PROFILE_ENABLED) {
     res.redirect("/dashboard?google=test_profile");
     return;
@@ -1374,6 +1390,7 @@ app.get("/auth/google", (req, res, next) => {
   try {
     const state = randomUUID();
     setOAuthStateOnSession(req, state);
+    await saveSessionAsync(req);
     res.redirect(getGoogleAuthUrl(state));
   } catch (error) {
     next(error);
@@ -1390,6 +1407,7 @@ app.get("/auth/google/callback", async (req, res, next) => {
   const expectedState = getOAuthStateFromSession(req);
   if (!expectedState || !state || state !== expectedState) {
     clearOAuthStateOnSession(req);
+    await saveSessionAsync(req);
     res.redirect("/dashboard?google=auth_error");
     return;
   }
@@ -1408,6 +1426,7 @@ app.get("/auth/google/callback", async (req, res, next) => {
         assignLegacyAppointmentsToUser(user.id);
       }
     }
+    await saveSessionAsync(req);
     res.redirect("/dashboard?google=connected");
   } catch (error) {
     if (error instanceof GoogleCalendarError) {
