@@ -1492,23 +1492,40 @@ app.get("/auth/google/callback", async (req, res, next) => {
   try {
     clearOAuthStateOnSession(req);
     const tokens = await exchangeCodeForTokens(code);
+    const hasTokens = Boolean(
+      tokens && (tokens.access_token || tokens.refresh_token || tokens.id_token)
+    );
+    console.log("[google-oauth] tokens received:", hasTokens);
     const mergedTokens = mergeGoogleTokens(tokens, req.session?.googleTokens || null);
     setGoogleTokensOnSession(req.session, mergedTokens);
-    const identityFromTokens = await resolveIdentityFromGoogleTokens(mergedTokens);
-    if (identityFromTokens) {
-      const user = upsertUserFromIdentity(identityFromTokens);
-      if (user) {
-        req.session.userId = user.id;
-        persistGoogleTokens(user.id, mergedTokens);
-        assignLegacyAppointmentsToUser(user.id);
-      }
-    }
-    if (!req.session?.userId) {
-      res.redirect("/auth/login?google=identity_error");
+    const identityFromTokens = extractGoogleIdentityFromTokens(mergedTokens);
+    console.log("[google-oauth] identity extracted:", Boolean(identityFromTokens));
+    if (!identityFromTokens) {
+      res.redirect("/dashboard?google=auth_error");
       return;
     }
-    await saveSessionAsync(req);
-    res.redirect("/dashboard?google=connected");
+
+    const user = upsertUserFromIdentity(identityFromTokens);
+    if (!user) {
+      console.log("[google-oauth] user assignment failed");
+      res.redirect("/dashboard?google=auth_error");
+      return;
+    }
+
+    req.session.userId = user.id;
+    req.session.authProvider = "google";
+    persistGoogleTokens(user.id, mergedTokens);
+    assignLegacyAppointmentsToUser(user.id);
+    console.log("[google-oauth] assigned user id:", user.id);
+
+    req.session.save((sessionError) => {
+      if (sessionError) {
+        console.error("[google-oauth] session save failed:", sessionError.message);
+        res.redirect("/dashboard?google=auth_error");
+        return;
+      }
+      res.redirect("/dashboard?google=connected");
+    });
   } catch (error) {
     if (error instanceof GoogleCalendarError) {
       res.redirect("/dashboard?google=auth_error");
