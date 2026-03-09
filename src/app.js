@@ -591,7 +591,7 @@ function isValidSignedOAuthState(value) {
   return Date.now() - issuedAt >= 0 && Date.now() - issuedAt <= maxAgeMs;
 }
 
-async function resolveIdentityFromGoogleTokens(tokens) {
+async function _resolveIdentityFromGoogleTokens(tokens) {
   const directIdentity = extractGoogleIdentityFromTokens(tokens);
   if (directIdentity) {
     return directIdentity;
@@ -1503,11 +1503,10 @@ app.get("/auth/google/callback", async (req, res, next) => {
     const hasTokens = Boolean(
       tokens && (tokens.access_token || tokens.refresh_token || tokens.id_token)
     );
-    console.log("[google-oauth] tokens received:", hasTokens);
+    console.log("[google-oauth] token exchange success:", hasTokens);
     const mergedTokens = mergeGoogleTokens(tokens, req.session?.googleTokens || null);
     setGoogleTokensOnSession(req.session, mergedTokens);
-    const extractedIdentity = extractGoogleIdentityFromTokens(mergedTokens);
-    const identityFromTokens = extractedIdentity || (await resolveIdentityFromGoogleTokens(mergedTokens));
+    const identityFromTokens = extractGoogleIdentityFromTokens(mergedTokens);
     console.log("[google-oauth] identity extracted:", Boolean(identityFromTokens));
     if (!identityFromTokens) {
       res.redirect("/dashboard?google=auth_error");
@@ -1551,6 +1550,7 @@ app.get("/auth/google/callback", async (req, res, next) => {
         res.redirect("/dashboard?google=auth_error");
         return;
       }
+      console.log("[google-oauth] session save success for user id:", user.id);
       res.redirect("/dashboard?google=connected");
     });
   } catch (error) {
