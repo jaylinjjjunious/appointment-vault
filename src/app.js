@@ -174,7 +174,7 @@ const TEST_PROFILE_EMAIL =
   String(process.env.TEST_PROFILE_EMAIL || "").trim() || "test-profile@appointment-vault.local";
 
 if (IS_PRODUCTION) {
-  app.set("trust proxy", 1);
+  app.set("trust proxy", true);
   if (!SESSION_SECRET || SESSION_SECRET === "appointment-vault-session-secret-change-me") {
     throw new Error("SESSION_SECRET must be set to a strong value in production.");
   }
@@ -551,6 +551,45 @@ function setOAuthStateOnSession(req, state) {
 function clearOAuthStateOnSession(req) {
   if (req.session?.googleOAuthState) {
     delete req.session.googleOAuthState;
+  }
+}
+
+async function resolveIdentityFromGoogleTokens(tokens) {
+  const directIdentity = extractGoogleIdentityFromTokens(tokens);
+  if (directIdentity) {
+    return directIdentity;
+  }
+
+  const accessToken = String(tokens?.access_token || "").trim();
+  if (!accessToken) {
+    return null;
+  }
+
+  try {
+    const { google } = require("googleapis");
+    const clientId = String(process.env.GOOGLE_CLIENT_ID || "").trim();
+    const clientSecret = String(process.env.GOOGLE_CLIENT_SECRET || "").trim();
+    const redirectUri = String(process.env.GOOGLE_REDIRECT_URI || "").trim();
+    if (!clientId || !clientSecret || !redirectUri) {
+      return null;
+    }
+    const oauth2Client = new google.auth.OAuth2(clientId, clientSecret, redirectUri);
+    oauth2Client.setCredentials({ access_token: accessToken });
+    const oauth2 = google.oauth2({ version: "v2", auth: oauth2Client });
+    const response = await oauth2.userinfo.get();
+    const profile = response?.data || {};
+    const providerUserId = String(profile.id || "").trim();
+    if (!providerUserId) {
+      return null;
+    }
+    return {
+      provider: "google",
+      providerUserId,
+      email: String(profile.email || "").trim() || null,
+      displayName: String(profile.name || "").trim() || null
+    };
+  } catch (error) {
+    return null;
   }
 }
 
@@ -1417,7 +1456,7 @@ app.get("/auth/google/callback", async (req, res, next) => {
     const tokens = await exchangeCodeForTokens(code);
     const mergedTokens = mergeGoogleTokens(tokens, req.session?.googleTokens || null);
     setGoogleTokensOnSession(req.session, mergedTokens);
-    const identityFromTokens = extractGoogleIdentityFromTokens(mergedTokens);
+    const identityFromTokens = await resolveIdentityFromGoogleTokens(mergedTokens);
     if (identityFromTokens) {
       const user = upsertUserFromIdentity(identityFromTokens);
       if (user) {
@@ -1425,6 +1464,10 @@ app.get("/auth/google/callback", async (req, res, next) => {
         persistGoogleTokens(user.id, mergedTokens);
         assignLegacyAppointmentsToUser(user.id);
       }
+    }
+    if (!req.session?.userId) {
+      res.redirect("/auth/login?google=identity_error");
+      return;
     }
     await saveSessionAsync(req);
     res.redirect("/dashboard?google=connected");
