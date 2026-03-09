@@ -92,6 +92,7 @@
         data-date="<%= item.date %>"
         data-time="<%= item.time %>"
         data-location="<%= item.location || '' %>"
+        data-map="<%= item.location || '' %>"
         data-link="/appointments/<%= item.id %>"
         aria-label="Open appointment details"
       >
@@ -121,7 +122,7 @@
   </div>
 </section>
 
-<div class="hero-modal" data-hero-modal hidden>
+<div class="hero-modal hero-sheet-modal" data-hero-modal hidden>
   <div class="hero-modal-backdrop" data-hero-close></div>
   <div class="hero-modal-card" role="dialog" aria-modal="true" aria-label="Appointment details">
     <button class="hero-modal-close" type="button" data-hero-close aria-label="Close">✕</button>
@@ -140,6 +141,16 @@
     </nav>
 
     <div class="hero-modal-body">
+      <div class="hero-modal-map-wrap" data-hero-map-wrap hidden>
+        <iframe
+          class="hero-modal-map"
+          data-hero-map
+          src=""
+          title="Appointment location map"
+          loading="lazy"
+          referrerpolicy="no-referrer-when-downgrade"
+        ></iframe>
+      </div>
       <p class="hero-modal-location" data-hero-location></p>
       <a class="hero-button" data-hero-link href="/appointments">Open Appointment</a>
     </div>
@@ -464,19 +475,39 @@
     const metaEl = modal.querySelector("[data-hero-meta]");
     const locationEl = modal.querySelector("[data-hero-location]");
     const linkEl = modal.querySelector("[data-hero-link]");
+    const mapWrapEl = modal.querySelector("[data-hero-map-wrap]");
+    const mapEl = modal.querySelector("[data-hero-map]");
 
     const openModal = (data) => {
       if (titleEl) titleEl.textContent = data.title || "Appointment";
       if (metaEl) metaEl.textContent = `${data.date || ""} ${data.time || ""}`.trim();
       if (locationEl) locationEl.textContent = data.location || "No location provided.";
       if (linkEl && data.link) linkEl.setAttribute("href", data.link);
+      const mapQuery = String(data.map || data.location || "").trim();
+      if (mapWrapEl && mapEl) {
+        if (mapQuery) {
+          mapEl.setAttribute(
+            "src",
+            `https://www.google.com/maps?hl=en&q=${encodeURIComponent(mapQuery)}&t=k&z=16&output=embed`
+          );
+          mapWrapEl.hidden = false;
+        } else {
+          mapWrapEl.hidden = true;
+          mapEl.setAttribute("src", "");
+        }
+      }
       modal.hidden = false;
       document.body.classList.add("modal-open");
+      requestAnimationFrame(() => modal.classList.add("is-open"));
     };
 
     const closeModal = () => {
-      modal.hidden = true;
+      modal.classList.remove("is-open");
+      setTimeout(() => {
+        modal.hidden = true;
+      }, 220);
       document.body.classList.remove("modal-open");
+      if (mapEl) mapEl.setAttribute("src", "");
     };
 
     document.querySelectorAll("[data-hero]").forEach((card) => {
@@ -486,6 +517,7 @@
           date: card.getAttribute("data-date"),
           time: card.getAttribute("data-time"),
           location: card.getAttribute("data-location"),
+          map: card.getAttribute("data-map"),
           link: card.getAttribute("data-link")
         });
       });
