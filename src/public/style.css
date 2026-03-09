@@ -345,6 +345,64 @@ body::after {
   font-weight: 700;
 }
 
+.profile-hub {
+  position: relative;
+}
+
+.profile-trigger {
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.profile-trigger:hover {
+  transform: translateY(-1px);
+  border-color: rgba(255, 255, 255, 0.35);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.28);
+}
+
+.profile-control-pill {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 0.5rem);
+  z-index: 35;
+  display: flex;
+  gap: 0.35rem;
+  padding: 0.3rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(15, 15, 20, 0.94);
+  box-shadow: 0 14px 30px rgba(0, 0, 0, 0.36);
+  opacity: 0;
+  transform: translateY(-6px) scale(0.98);
+  pointer-events: none;
+  transition: opacity 0.18s ease, transform 0.22s ease;
+}
+
+.profile-hub.is-open .profile-control-pill {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+  pointer-events: auto;
+}
+
+.profile-control-button {
+  border: 0;
+  border-radius: 999px;
+  padding: 0.45rem 0.85rem;
+  color: #fff;
+  background: rgba(255, 255, 255, 0.08);
+  font-size: 0.78rem;
+  font-weight: 650;
+  cursor: pointer;
+  transition: background 0.2s ease, transform 0.2s ease;
+  white-space: nowrap;
+}
+
+.profile-control-button:hover {
+  background: rgba(255, 255, 255, 0.18);
+  transform: translateY(-1px);
+}
+
 .app-content {
   display: grid;
   gap: 1.6rem;
@@ -3109,6 +3167,30 @@ summary:focus-visible {
     transform: translateY(105%);
     transition: transform 0.24s ease;
     overflow-y: auto;
+  }
+
+  .profile-mini-card {
+    height: min(860px, calc(100dvh - 18px));
+  }
+
+  .profile-mini-body {
+    display: grid;
+    gap: 0.8rem;
+  }
+
+  .profile-mini-embed-wrap {
+    border-radius: 16px;
+    overflow: hidden;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: #0f1117;
+    min-height: 58dvh;
+  }
+
+  .profile-mini-embed {
+    width: 100%;
+    height: 58dvh;
+    border: 0;
+    display: block;
   }
 
   .hero-sheet-modal.is-open .hero-modal-card {

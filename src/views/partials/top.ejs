@@ -121,10 +121,162 @@
             </button>
             <button type="button" class="icon-button" data-theme-toggle aria-pressed="false" aria-label="Toggle dark mode">🌙</button>
             <% if (safeCurrentUser) { %>
-              <div class="avatar-pill"><%= userInitial %></div>
+              <div class="profile-hub" data-profile-hub>
+                <button
+                  type="button"
+                  class="avatar-pill profile-trigger"
+                  data-profile-trigger
+                  aria-expanded="false"
+                  aria-haspopup="true"
+                  aria-label="Open profile controls"
+                >
+                  <%= userInitial %>
+                </button>
+                <div class="profile-control-pill" data-profile-pill hidden>
+                  <button
+                    type="button"
+                    class="profile-control-button"
+                    data-profile-open="calendar"
+                    data-profile-src="/calendar"
+                    data-profile-title="Calendar"
+                    data-profile-meta="View your calendar panel"
+                  >
+                    Calendar
+                  </button>
+                  <button
+                    type="button"
+                    class="profile-control-button"
+                    data-profile-open="checkin"
+                    data-profile-src="/checkin"
+                    data-profile-title="Check-In"
+                    data-profile-meta="Open your check-in panel"
+                  >
+                    Check-In
+                  </button>
+                </div>
+              </div>
             <% } %>
           </div>
         </header>
+
+        <% if (safeCurrentUser) { %>
+          <div class="hero-modal hero-sheet-modal profile-mini-modal" data-profile-mini-modal hidden>
+            <div class="hero-modal-backdrop" data-profile-mini-close></div>
+            <div class="hero-modal-card profile-mini-card" role="dialog" aria-modal="true" aria-label="Quick panel">
+              <button class="hero-modal-close" type="button" data-profile-mini-close aria-label="Close">✕</button>
+              <div class="hero-modal-header">
+                <div>
+                  <p class="hero-modal-eyebrow">Quick Panel</p>
+                  <h3 class="hero-modal-title" data-profile-mini-title>Panel</h3>
+                  <p class="hero-modal-meta" data-profile-mini-meta>Open a quick view.</p>
+                </div>
+              </div>
+              <div class="hero-modal-body profile-mini-body">
+                <div class="hero-modal-actions">
+                  <a
+                    class="hero-button"
+                    data-profile-mini-open-full
+                    href="/calendar"
+                  >
+                    Open Full Page
+                  </a>
+                </div>
+                <div class="profile-mini-embed-wrap">
+                  <iframe
+                    class="profile-mini-embed"
+                    data-profile-mini-embed
+                    src=""
+                    title="Quick panel"
+                    loading="lazy"
+                    referrerpolicy="no-referrer-when-downgrade"
+                  ></iframe>
+                </div>
+              </div>
+            </div>
+          </div>
+          <script>
+            (() => {
+              const hub = document.querySelector("[data-profile-hub]");
+              const trigger = document.querySelector("[data-profile-trigger]");
+              const pill = document.querySelector("[data-profile-pill]");
+              const modal = document.querySelector("[data-profile-mini-modal]");
+              if (!hub || !trigger || !pill || !modal) return;
+
+              const titleEl = modal.querySelector("[data-profile-mini-title]");
+              const metaEl = modal.querySelector("[data-profile-mini-meta]");
+              const frameEl = modal.querySelector("[data-profile-mini-embed]");
+              const openFullEl = modal.querySelector("[data-profile-mini-open-full]");
+              const closeButtons = Array.from(modal.querySelectorAll("[data-profile-mini-close]"));
+
+              const closePill = () => {
+                hub.classList.remove("is-open");
+                trigger.setAttribute("aria-expanded", "false");
+                pill.hidden = true;
+              };
+
+              const openPill = () => {
+                hub.classList.add("is-open");
+                trigger.setAttribute("aria-expanded", "true");
+                pill.hidden = false;
+              };
+
+              const closeMini = () => {
+                modal.classList.remove("is-open");
+                setTimeout(() => {
+                  modal.hidden = true;
+                  if (frameEl) frameEl.setAttribute("src", "");
+                }, 220);
+                document.body.classList.remove("modal-open");
+              };
+
+              const openMini = (button) => {
+                const src = String(button.getAttribute("data-profile-src") || "/calendar");
+                const title = String(button.getAttribute("data-profile-title") || "Panel");
+                const meta = String(button.getAttribute("data-profile-meta") || "");
+                if (titleEl) titleEl.textContent = title;
+                if (metaEl) metaEl.textContent = meta;
+                if (frameEl) frameEl.setAttribute("src", src);
+                if (openFullEl) openFullEl.setAttribute("href", src);
+                modal.hidden = false;
+                document.body.classList.add("modal-open");
+                requestAnimationFrame(() => modal.classList.add("is-open"));
+              };
+
+              trigger.addEventListener("click", (event) => {
+                event.stopPropagation();
+                if (hub.classList.contains("is-open")) {
+                  closePill();
+                } else {
+                  openPill();
+                }
+              });
+
+              pill.querySelectorAll("[data-profile-open]").forEach((button) => {
+                button.addEventListener("click", () => {
+                  closePill();
+                  openMini(button);
+                });
+              });
+
+              closeButtons.forEach((button) => {
+                button.addEventListener("click", closeMini);
+              });
+
+              document.addEventListener("click", (event) => {
+                if (!hub.contains(event.target)) {
+                  closePill();
+                }
+              });
+
+              document.addEventListener("keydown", (event) => {
+                if (event.key === "Escape") {
+                  closePill();
+                  closeMini();
+                }
+              });
+            })();
+          </script>
+        <% } %>
 
         <main class="app-content">
           <% if (showMobileHeader) { %>
