@@ -3030,11 +3030,27 @@ summary:focus-visible {
     max-width: 100%;
   }
 
+  .dashboard-hero-scroll {
+    grid-auto-columns: 100%;
+    gap: 0;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scroll-padding-inline: 0;
+    -webkit-overflow-scrolling: touch;
+  }
+
   .appointments-hero-scroll .mobile-hero-card {
     min-width: 0;
     width: 100%;
     max-width: 100%;
     scroll-snap-align: start;
+  }
+
+  .dashboard-hero-scroll .mobile-hero-card {
+    margin-bottom: 0;
+    width: 100%;
+    min-width: 100%;
+    max-width: 100%;
   }
 
   .appointments-hero-scroll > * {
