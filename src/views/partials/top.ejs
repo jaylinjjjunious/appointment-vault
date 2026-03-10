@@ -153,6 +153,16 @@
                   >
                     Check-In
                   </button>
+                  <button
+                    type="button"
+                    class="profile-control-button"
+                    data-profile-open="automation"
+                    data-profile-src="/settings#automation"
+                    data-profile-title="Automation"
+                    data-profile-meta="Open your website automation controls"
+                  >
+                    Automation
+                  </button>
                 </div>
               </div>
             <% } %>
@@ -249,6 +259,19 @@
                     openExternalEl.hidden = false;
                     openExternalEl.textContent = "Open CE Check-In";
                     openExternalEl.setAttribute("href", "https://www.cecheckin.com/client/account/signin");
+                  }
+                } else if (panel === "automation") {
+                  if (contentEl) {
+                    contentEl.textContent =
+                      "Your CE Check-In login is stored securely on the backend and reused automatically when automation runs.";
+                  }
+                  if (openFullEl) {
+                    openFullEl.textContent = "Open Automation";
+                    openFullEl.setAttribute("href", "/settings#automation");
+                  }
+                  if (openExternalEl) {
+                    openExternalEl.hidden = true;
+                    openExternalEl.setAttribute("href", "#");
                   }
                 } else {
                   if (contentEl) {
@@ -352,6 +375,16 @@
                       data-profile-meta="Open your check-in panel"
                     >
                       Check-In
+                    </button>
+                    <button
+                      type="button"
+                      class="profile-control-button"
+                      data-profile-open="automation"
+                      data-profile-src="/settings#automation"
+                      data-profile-title="Automation"
+                      data-profile-meta="Open your website automation controls"
+                    >
+                      Automation
                     </button>
                   </div>
                 </div>

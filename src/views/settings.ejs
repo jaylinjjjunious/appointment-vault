@@ -189,6 +189,9 @@
     <p class="section-empty">
       Connect <strong><%= safeAutomation.targetName %></strong> and schedule automatic form submission from your saved appointments.
     </p>
+    <p class="section-empty">
+      Your website login is stored securely on the backend. After you save it once, automation reuses it whenever it needs to sign in.
+    </p>
     <form class="form-grid" action="/settings/automation" method="POST">
       <label class="checkbox-field" for="automationEnabled">
         <input
@@ -203,11 +206,11 @@
       <div class="form-row">
         <div class="form-field">
           <label for="automationUsername">Website Username</label>
-          <input id="automationUsername" class="glass-input" name="username" type="text" placeholder="<%= safeAutomation.hasStoredCredentials ? 'Stored securely' : 'username' %>" />
+          <input id="automationUsername" class="glass-input" name="username" type="text" placeholder="<%= safeAutomation.hasStoredCredentials ? 'Leave blank to keep saved login' : 'username' %>" />
         </div>
         <div class="form-field">
           <label for="automationPassword">Website Password</label>
-          <input id="automationPassword" class="glass-input" name="password" type="password" placeholder="<%= safeAutomation.hasStoredCredentials ? 'Stored securely' : 'password' %>" />
+          <input id="automationPassword" class="glass-input" name="password" type="password" placeholder="<%= safeAutomation.hasStoredCredentials ? 'Leave blank to keep saved password' : 'password' %>" />
         </div>
       </div>
       <div class="form-row">
@@ -228,7 +231,7 @@
         </label>
       </div>
       <div class="actions">
-        <button class="button glass-button" type="submit">Save Automation Settings</button>
+        <button class="button glass-button" type="submit">Save Stored Login</button>
       </div>
     </form>
 
