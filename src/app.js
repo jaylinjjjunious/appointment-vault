@@ -231,6 +231,7 @@ const BUILD_BRANCH =
 const BUILD_INSTANCE =
   String(process.env.RENDER_INSTANCE_ID || process.env.HOSTNAME || "unknown").trim() || "unknown";
 const LEGACY_APPOINTMENT_ASSIGNMENT_KEY = "legacy.appointments.assigned";
+const PHOTO_HANDOFF_TOKEN_TTL_MS = 1000 * 60 * 60 * 12;
 
 function ensureUsersGoogleTokensColumn() {
   const userColumns = db.prepare("PRAGMA table_info(users)").all();
@@ -745,6 +746,80 @@ function getBestExternalUrl(req) {
     "http";
   const host = String(req.get("x-forwarded-host") || req.get("host") || "").trim();
   return `${protocol}://${host}`;
+}
+
+function createSignedPhotoHandoffToken(userId, handoffId, updatedAt = "") {
+  const expiresAt = Date.now() + PHOTO_HANDOFF_TOKEN_TTL_MS;
+  const payload = `${Number(userId || 0)}.${Number(handoffId || 0)}.${expiresAt}.${String(updatedAt || "")}`;
+  const signature = createHmac("sha256", SESSION_SECRET).update(payload).digest("base64url");
+  return `${payload}.${signature}`;
+}
+
+function parseSignedPhotoHandoffToken(token) {
+  const raw = String(token || "").trim();
+  if (!raw) {
+    return null;
+  }
+  const parts = raw.split(".");
+  if (parts.length < 5) {
+    return null;
+  }
+  const signature = parts.pop();
+  const payload = parts.join(".");
+  const expected = createHmac("sha256", SESSION_SECRET).update(payload).digest("base64url");
+  const signatureBuffer = Buffer.from(signature);
+  const expectedBuffer = Buffer.from(expected);
+  if (
+    signatureBuffer.length !== expectedBuffer.length ||
+    !timingSafeEqual(signatureBuffer, expectedBuffer)
+  ) {
+    return null;
+  }
+  const [userIdRaw, handoffIdRaw, expiresAtRaw, ...updatedAtParts] = parts;
+  const userId = Number.parseInt(userIdRaw, 10);
+  const handoffId = Number.parseInt(handoffIdRaw, 10);
+  const expiresAt = Number.parseInt(expiresAtRaw, 10);
+  const updatedAt = updatedAtParts.join(".");
+  if (!userId || !handoffId || !Number.isFinite(expiresAt) || Date.now() > expiresAt) {
+    return null;
+  }
+  return {
+    userId,
+    handoffId,
+    expiresAt,
+    updatedAt
+  };
+}
+
+function setCeCheckInCompanionCors(req, res) {
+  const origin = String(req.get("origin") || "").trim();
+  if (origin === "https://www.cecheckin.com") {
+    res.setHeader("Access-Control-Allow-Origin", origin);
+    res.setHeader("Vary", "Origin");
+    return true;
+  }
+  return false;
+}
+
+function resolveTokenizedPhotoHandoff(req, res) {
+  const parsedToken = parseSignedPhotoHandoffToken(req.query.token);
+  if (!parsedToken) {
+    res.status(401).json({ ok: false, message: "Invalid photo handoff token." });
+    return null;
+  }
+  const handoff = getCurrentPhotoHandoffState(parsedToken.userId);
+  if (!handoff || Number(handoff.id) !== Number(parsedToken.handoffId)) {
+    res.status(404).json({ ok: false, message: "Photo handoff not found." });
+    return null;
+  }
+  if (parsedToken.updatedAt && String(handoff.updatedAt || "") !== String(parsedToken.updatedAt)) {
+    res.status(409).json({ ok: false, message: "Photo handoff is out of date." });
+    return null;
+  }
+  return {
+    ...handoff,
+    userId: parsedToken.userId
+  };
 }
 
 function requireTwilioSignature(req, res, next) {
@@ -2277,6 +2352,59 @@ app.get("/automation/panel", (req, res) => {
     automation: getUserAutomationView(user.id)
   });
 });
+app.get("/automation/companion", (req, res) => {
+  const user = requireCurrentUser(req, res);
+  if (!user) {
+    return;
+  }
+
+  const installBaseUrl = getBestExternalUrl(req);
+  const bookmarkletSource = `javascript:(()=>{const s=document.createElement('script');s.src='${installBaseUrl}/public/cecheckin-companion.js?ts='+Date.now();document.documentElement.appendChild(s);})();`;
+  res.render("automation-companion", {
+    title: "CE Check-In Helper",
+    page: "settings",
+    companionScriptUrl: `${installBaseUrl}/automation/companion.user.js`,
+    companionLoaderUrl: `${installBaseUrl}/public/cecheckin-companion.js`,
+    bookmarkletSource
+  });
+});
+app.get("/automation/companion.user.js", (req, res) => {
+  const installBaseUrl = getBestExternalUrl(req);
+  res.type("application/javascript").send(`// ==UserScript==
+// @name         Appointment Vault CE Check-In Helper
+// @namespace    ${installBaseUrl}
+// @version      1.0.0
+// @description  Replays Appointment Vault photo handoff state inside CE Check-In and continues after photo capture.
+// @match        https://www.cecheckin.com/client/*
+// @run-at       document-idle
+// @grant        none
+// ==/UserScript==
+
+(function () {
+  var script = document.createElement('script');
+  script.src = '${installBaseUrl}/public/cecheckin-companion.js?ts=' + Date.now();
+  document.documentElement.appendChild(script);
+})();`);
+});
+app.get("/automation/photo-handoff/launch", (req, res) => {
+  const user = requireCurrentUser(req, res);
+  if (!user) {
+    return;
+  }
+
+  const handoff = getCurrentPhotoHandoffState(user.id);
+  if (!handoff?.resumeUrl) {
+    res.redirect("/settings?automation=no_photo_handoff#automation");
+    return;
+  }
+  const targetUrl = new URL(handoff.resumeUrl);
+  targetUrl.searchParams.set("avAppOrigin", getBestExternalUrl(req));
+  targetUrl.searchParams.set(
+    "avHandoffToken",
+    createSignedPhotoHandoffToken(user.id, handoff.id, handoff.updatedAt || "")
+  );
+  res.redirect(targetUrl.toString());
+});
 app.get("/automation/live", (req, res) => {
   const user = requireCurrentUser(req, res);
   if (!user) {
@@ -2329,6 +2457,19 @@ app.get("/automation/viewer/stream", (req, res) => {
   }
 });
 app.get("/automation/photo-handoff/state", (req, res) => {
+  if (String(req.query.token || "").trim()) {
+    setCeCheckInCompanionCors(req, res);
+    const handoff = resolveTokenizedPhotoHandoff(req, res);
+    if (!handoff) {
+      return;
+    }
+    res.json({
+      ok: true,
+      handoff
+    });
+    return;
+  }
+
   const user = requireCurrentUser(req, res);
   if (!user) {
     return;
@@ -2343,6 +2484,19 @@ app.get("/automation/photo-handoff/state", (req, res) => {
     ok: true,
     handoff: handoffState
   });
+});
+app.get("/automation/photo-handoff/complete", (req, res) => {
+  setCeCheckInCompanionCors(req, res);
+  const handoff = resolveTokenizedPhotoHandoff(req, res);
+  if (!handoff) {
+    return;
+  }
+  try {
+    completeMonthlyPhotoHandoff(handoff.userId, handoff.id);
+    res.json({ ok: true });
+  } catch (error) {
+    res.status(400).json({ ok: false, message: error?.message || "Unable to complete photo handoff." });
+  }
 });
 app.get("/automation/snapshot/:mode", (req, res) => {
   const user = requireCurrentUser(req, res);

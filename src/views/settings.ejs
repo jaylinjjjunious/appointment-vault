@@ -358,17 +358,26 @@
           <form action="/settings/automation/photo-start" method="POST">
             <button class="button glass-button button-secondary" type="submit">Start Monthly Photo Step</button>
           </form>
+          <a class="button glass-button button-secondary" href="/automation/companion">
+            Install CE Helper
+          </a>
           <% if (!safeAutomation.enabled || !safeAutomation.monthlyPhotoEnabled || !safeAutomation.hasStoredCredentials) { %>
             <p class="section-empty">Start Monthly Photo Step becomes useful after your saved login, automation, and monthly photo handoff are all turned on.</p>
           <% } %>
           <% if (safeAutomation.lastHandoffResumeUrl) { %>
             <a
               class="button glass-button button-secondary"
+              href="/automation/photo-handoff/launch"
+            >
+              Open Assisted Photo Step
+            </a>
+            <a
+              class="button glass-button button-secondary"
               href="<%= safeAutomation.lastHandoffResumeUrl %>"
               target="_blank"
               rel="noopener noreferrer"
             >
-              Open Photo Step
+              Open Raw Photo Step
             </a>
           <% } %>
           <% if (safeAutomation.currentPhotoHandoff && safeAutomation.currentPhotoHandoff.id && safeAutomation.currentPhotoHandoff.status === "waiting_for_user") { %>

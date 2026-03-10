@@ -28,8 +28,10 @@
     Your CE Check-In login is stored on the backend and reused automatically whenever automation needs to sign in.
   </p>
   <p class="section-empty"><strong>Next:</strong> <%= nextMiniStep %></p>
+  <p><a href="/automation/companion">Install CE Helper</a></p>
   <% if (automation.lastHandoffResumeUrl) { %>
-    <p><a href="<%= automation.lastHandoffResumeUrl %>" target="_blank" rel="noopener noreferrer">Open Photo Step</a></p>
+    <p><a href="/automation/photo-handoff/launch">Open Assisted Photo Step</a></p>
+    <p><a href="<%= automation.lastHandoffResumeUrl %>" target="_blank" rel="noopener noreferrer">Open Raw Photo Step</a></p>
   <% } %>
   <% const snapshotMode = automation.hasCurrentRunSnapshot ? "current" : (automation.hasLastRunSnapshot ? "last" : ""); %>
   <div class="automation-visual" data-automation-live-viewer <%= automation.viewerActive ? "" : "hidden" %>>

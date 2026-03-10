@@ -1,0 +1,38 @@
+<%- include("partials/top", { title, page: "settings" }) %>
+
+<section class="page-heading settings-heading">
+  <h1>CE Check-In Helper</h1>
+  <p>Install the helper once, then use the assisted photo step when the agent pauses for your live photo.</p>
+</section>
+
+<section class="calendar-section glass-panel">
+  <h2>How It Works</h2>
+  <p class="section-empty">The agent prepares the report in Appointment Vault. The helper replays that saved state inside CE Check-In on your device, waits for your live photo, then finishes the check-in there.</p>
+</section>
+
+<section class="calendar-section glass-panel">
+  <h2>Install</h2>
+  <p class="section-empty">Best option: install the userscript into Tampermonkey or another userscript manager.</p>
+  <div class="actions">
+    <a class="button glass-button" href="<%= companionScriptUrl %>">Install Userscript</a>
+    <a class="button glass-button button-secondary" href="/settings#automation">Back to Automation</a>
+  </div>
+</section>
+
+<section class="calendar-section glass-panel">
+  <h2>Bookmarklet</h2>
+  <p class="section-empty">If you prefer, save this as a bookmark and tap it while you are on CE Check-In.</p>
+  <pre class="error-report__box" style="white-space: pre-wrap; word-break: break-all;"><%= bookmarkletSource %></pre>
+  <p class="section-empty">Loader URL: <code><%= companionLoaderUrl %></code></p>
+</section>
+
+<section class="calendar-section glass-panel">
+  <h2>Use It</h2>
+  <p>1. Start the monthly photo step in Automation.</p>
+  <p>2. Tap <strong>Open Assisted Photo Step</strong>.</p>
+  <p>3. Let the helper refill the report on CE Check-In.</p>
+  <p>4. Take the photo on the website.</p>
+  <p>5. The helper will click through the check-in after the photo appears.</p>
+</section>
+
+<%- include("partials/bottom") %>

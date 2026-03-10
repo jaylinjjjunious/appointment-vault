@@ -177,4 +177,59 @@ describe("automation viewer routes", () => {
       delete require.cache[require.resolve("../src/app")];
     }
   });
+
+  it("creates an assisted photo-step launch URL with a signed handoff token", async () => {
+    const db = require("../src/db");
+    const { getAutomationConfig } = require("../src/automation/config");
+    const originalTempProfile = process.env.TEMP_TEST_PROFILE;
+    try {
+      process.env.TEMP_TEST_PROFILE = "true";
+      delete require.cache[require.resolve("../src/routes/authRoutes")];
+      delete require.cache[require.resolve("../src/app")];
+      const app = require("../src/app");
+      const agent = request.agent(app);
+
+      const loginPage = await agent.get("/auth/login");
+      const csrfMatch = String(loginPage.text || "").match(/name="_csrf"\s+value="([^"]+)"/);
+      expect(csrfMatch).toBeTruthy();
+      await agent.post("/auth/bypass").type("form").send({ _csrf: csrfMatch[1] });
+
+      const user = db.prepare("SELECT * FROM users WHERE provider = 'test' ORDER BY id DESC LIMIT 1").get();
+      const config = getAutomationConfig();
+      const nowIso = new Date().toISOString();
+      db.prepare("DELETE FROM automation_photo_handoffs WHERE userId = ? AND siteId = ?").run(user.id, config.siteId);
+      db.prepare("DELETE FROM automation_integrations WHERE userId = ? AND siteId = ?").run(user.id, config.siteId);
+      db.prepare(`
+        INSERT INTO automation_integrations (
+          userId, siteId, targetName, enabled, monthlyPhotoEnabled, monthlyPhotoDay, createdAt, updatedAt
+        ) VALUES (?, ?, ?, 1, 1, 1, ?, ?)
+      `).run(user.id, config.siteId, config.targetName, nowIso, nowIso);
+      db.prepare(`
+        INSERT INTO automation_photo_handoffs (
+          userId, siteId, periodKey, scheduledFor, status, checkpoint, checkpointStateJson,
+          resumeUrl, failureMessage, notificationSent, createdAt, updatedAt, completedAt
+        ) VALUES (?, ?, ?, ?, 'waiting_for_user', ?, ?, ?, NULL, 0, ?, ?, NULL)
+      `).run(
+        user.id,
+        config.siteId,
+        "2026-03",
+        nowIso,
+        "photo_capture_required",
+        JSON.stringify({ checkpoint: "photo_capture_required" }),
+        "https://www.cecheckin.com/client/en-us/report/demo",
+        nowIso,
+        nowIso
+      );
+
+      const response = await agent.get("/automation/photo-handoff/launch");
+      expect(response.status).toBe(302);
+      expect(response.headers.location).toContain("https://www.cecheckin.com/client/en-us/report/demo");
+      expect(response.headers.location).toContain("avHandoffToken=");
+      expect(response.headers.location).toContain("avAppOrigin=");
+    } finally {
+      process.env.TEMP_TEST_PROFILE = originalTempProfile;
+      delete require.cache[require.resolve("../src/routes/authRoutes")];
+      delete require.cache[require.resolve("../src/app")];
+    }
+  });
 });
