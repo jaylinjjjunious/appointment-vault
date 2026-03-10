@@ -8,13 +8,20 @@ async function main() {
     process.exit(1);
   }
 
-  console.log("[playwright-verify] chromium executable:", playwright.chromium.executablePath());
+  const executablePath = playwright.chromium.executablePath();
+  const launchOptions = {
+    headless: true,
+    executablePath
+  };
+
+  console.log("[playwright-verify] chromium executable:", executablePath);
   console.log(
     "[playwright-verify] chromium executable exists:",
-    fs.existsSync(playwright.chromium.executablePath())
+    fs.existsSync(executablePath)
   );
+  console.log("[playwright-verify] launch options:", JSON.stringify(launchOptions));
 
-  const browser = await playwright.chromium.launch({ headless: true });
+  const browser = await playwright.chromium.launch(launchOptions);
   const page = await browser.newPage();
 
   try {

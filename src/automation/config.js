@@ -90,6 +90,7 @@ function getAutomationConfig() {
     contactZip: String(process.env.AUTOMATION_CONTACT_ZIP || "").trim(),
     updateMailingAddress: parseBoolean(process.env.AUTOMATION_UPDATE_MAILING_ADDRESS, false),
     headless: parseBoolean(process.env.PLAYWRIGHT_HEADLESS, true),
+    browserExecutablePath: String(process.env.PLAYWRIGHT_EXECUTABLE_PATH || "").trim(),
     timeoutMs: Math.max(parseInteger(process.env.AUTOMATION_TIMEOUT_MS, 20000), 5000),
     workerIntervalMs: Math.max(parseInteger(process.env.AUTOMATION_WORKER_INTERVAL_MS, 60000), 10000),
     defaultLeadMinutes: Math.max(parseInteger(process.env.AUTOMATION_DEFAULT_LEAD_MINUTES, 60), 0),

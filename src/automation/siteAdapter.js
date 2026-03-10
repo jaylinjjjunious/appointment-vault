@@ -107,6 +107,19 @@ function createFailureArtifacts(config, slug, pageContent, screenshotBuffer) {
   return { htmlPath, screenshotPath };
 }
 
+function buildChromiumLaunchOptions(playwright, config) {
+  const options = {
+    headless: config.headless
+  };
+  const executablePath =
+    String(config.browserExecutablePath || "").trim() ||
+    String(playwright?.chromium?.executablePath?.() || "").trim();
+  if (executablePath) {
+    options.executablePath = executablePath;
+  }
+  return options;
+}
+
 function createSingleSiteAdapter(config = getAutomationConfig()) {
   const fieldMap = Object.entries(config.fieldMap || {}).reduce((accumulator, [key, value]) => {
     const normalized = normalizeFieldDefinition(value);
@@ -251,7 +264,9 @@ function createSingleSiteAdapter(config = getAutomationConfig()) {
         throw new Error("Automation target is not fully configured.");
       }
       const playwright = await requirePlaywright();
-      const browser = await playwright.chromium.launch({ headless: config.headless });
+      const browser = await playwright.chromium.launch(
+        buildChromiumLaunchOptions(playwright, config)
+      );
       const page = await browser.newPage();
 
       try {
@@ -291,5 +306,6 @@ function createSingleSiteAdapter(config = getAutomationConfig()) {
 
 module.exports = {
   buildPayloadFromAppointment,
+  buildChromiumLaunchOptions,
   createSingleSiteAdapter
 };

@@ -4,7 +4,7 @@ services:
     env: node
     plan: free
     autoDeploy: true
-    buildCommand: npm ci && npm run playwright:install && npm run playwright:verify
+    buildCommand: npm ci && PLAYWRIGHT_BROWSERS_PATH=0 npm run playwright:install && PLAYWRIGHT_BROWSERS_PATH=0 npm run playwright:verify
     startCommand: npm start
     healthCheckPath: /health
     disk:
@@ -75,7 +75,7 @@ services:
       - key: PLAYWRIGHT_HEADLESS
         value: "true"
       - key: PLAYWRIGHT_BROWSERS_PATH
-        value: /opt/render/.cache/ms-playwright
+        value: "0"
       - key: AUTOMATION_WORKER_INTERVAL_MS
         value: "60000"
       - key: TWILIO_ACCOUNT_SID
@@ -89,7 +89,7 @@ services:
     env: node
     plan: free
     autoDeploy: true
-    buildCommand: npm ci && npm run playwright:install && npm run playwright:verify
+    buildCommand: npm ci && PLAYWRIGHT_BROWSERS_PATH=0 npm run playwright:install && PLAYWRIGHT_BROWSERS_PATH=0 npm run playwright:verify
     startCommand: npm run worker:automation
     disk:
       name: data
@@ -147,6 +147,6 @@ services:
       - key: PLAYWRIGHT_HEADLESS
         value: "true"
       - key: PLAYWRIGHT_BROWSERS_PATH
-        value: /opt/render/.cache/ms-playwright
+        value: "0"
       - key: AUTOMATION_WORKER_INTERVAL_MS
         value: "60000"
