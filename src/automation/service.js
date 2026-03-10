@@ -525,16 +525,36 @@ function runDetached(promiseFactory) {
   }, 0);
 }
 
+function withTimeout(promise, timeoutMs, label) {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      reject(new Error(`${label} timed out after ${timeoutMs}ms.`));
+    }, timeoutMs);
+
+    Promise.resolve(promise)
+      .then((value) => {
+        clearTimeout(timer);
+        resolve(value);
+      })
+      .catch((error) => {
+        clearTimeout(timer);
+        reject(error);
+      });
+  });
+}
+
 function startAutomationLoginTest(userId) {
   const integration = getUserAutomationIntegrationRow(userId);
   if (!integration) {
     throw new Error("Save automation settings first.");
   }
 
+  const config = getAutomationConfig();
+  const timeoutMs = Math.max(config.timeoutMs * 2, 45000);
   updateIntegrationRunStatus(userId, "running", "Automation login test in progress.");
   runDetached(async () => {
     try {
-      await runAutomationLoginTest(userId);
+      await withTimeout(runAutomationLoginTest(userId), timeoutMs, "Automation login test");
       updateIntegrationRunStatus(userId, "succeeded", "", new Date().toISOString());
     } catch (error) {
       updateIntegrationRunStatus(
@@ -552,10 +572,16 @@ function startAutomationSubmissionDryRun(userId) {
     throw new Error("Save automation settings first.");
   }
 
+  const config = getAutomationConfig();
+  const timeoutMs = Math.max(config.timeoutMs * 4, 90000);
   updateIntegrationRunStatus(userId, "running", "Automation dry run in progress.");
   runDetached(async () => {
     try {
-      await runAutomationSubmissionDryRun(userId);
+      await withTimeout(
+        runAutomationSubmissionDryRun(userId),
+        timeoutMs,
+        "Automation dry run"
+      );
       updateIntegrationRunStatus(userId, "succeeded", "", new Date().toISOString());
     } catch (error) {
       updateIntegrationRunStatus(
