@@ -93,6 +93,41 @@
           nextLocationResultValue?.displayName || nextLocationQueryValue
         )}&t=k&z=16&output=embed`
       : "";
+  const dashboardHeroCards = [
+    resolvedNextFocus,
+    ...safeTodayAppointments.filter((appointment) => !appointment.isCompleted),
+    ...safeThisWeekAppointments.filter((appointment) => !appointment.isCompleted),
+    ...safeUpcomingAppointments.filter((appointment) => !appointment.isCompleted)
+  ]
+    .filter(Boolean)
+    .reduce((accumulator, appointment) => {
+      const key = String(appointment.id || `${appointment.title}|${appointment.date}|${appointment.time}`);
+      if (accumulator.seen.has(key)) {
+        return accumulator;
+      }
+      accumulator.seen.add(key);
+      const locationValue = String(appointment.location || "").trim();
+      const displayName =
+        resolvedNextFocus && Number(appointment.id) === Number(resolvedNextFocus.id)
+          ? nextLocationResultValue?.displayName || locationValue
+          : locationValue;
+      accumulator.items.push({
+        id: appointment.id,
+        title: appointment.title || "Appointment",
+        date: appointment.date || "",
+        time: appointment.time || "",
+        location: displayName,
+        mapQuery: displayName || locationValue,
+        mapEmbedUrl:
+          displayName || locationValue
+            ? `https://www.google.com/maps?hl=en&q=${encodeURIComponent(
+                displayName || locationValue
+              )}&t=k&z=16&output=embed`
+            : "",
+        isPrimary: resolvedNextFocus && Number(appointment.id) === Number(resolvedNextFocus.id)
+      });
+      return accumulator;
+    }, { seen: new Set(), items: [] }).items.slice(0, 8);
   const highlightAppointments = [
     ...safeTodayAppointments.filter((appointment) => !appointment.isCompleted),
     ...safeThisWeekAppointments.filter((appointment) => !appointment.isCompleted),
@@ -157,40 +192,58 @@
     <a class="pill" href="/settings">Settings</a>
   </nav>
 
-  <section
-    class="mobile-hero-card appointment-hero"
-    data-hero
-    data-title="<%= resolvedNextFocus ? resolvedNextFocus.title : 'Appointment' %>"
-    data-date="<%= resolvedNextFocus ? resolvedNextFocus.date : '' %>"
-    data-time="<%= resolvedNextFocus ? resolvedNextFocus.time : '' %>"
-    data-location="<%= resolvedNextFocus ? (resolvedNextFocus.location || '') : '' %>"
-    data-map="<%= nextMapQuery %>"
-    data-link="<%= nextFocusHref %>"
-  >
-    <div class="hero-media <%= mapEmbedUrl ? 'has-map' : '' %>">
-      <% if (mapEmbedUrl) { %>
-        <iframe
-          class="hero-map"
-          src="<%= mapEmbedUrl %>"
-          title="Appointment location map"
-          loading="lazy"
-          referrerpolicy="no-referrer-when-downgrade"
-        ></iframe>
-      <% } else { %>
-        <div class="hero-figure" aria-hidden="true"></div>
-      <% } %>
-    </div>
-    <div class="hero-body">
-      <p class="hero-eyebrow">For Today</p>
-      <h3 class="hero-title"><%= resolvedNextFocus ? resolvedNextFocus.title : "No upcoming appointments" %></h3>
-      <p class="hero-meta"><%= resolvedNextFocus ? `${resolvedNextFocus.date} · ${to12Hour(resolvedNextFocus.time)}` : "Plan your next visit." %></p>
-      <p class="hero-location"><%= locationDisplay %></p>
-      <% if (mapEmbedUrl) { %>
-        <p class="hero-attribution">Map data © Google</p>
-      <% } %>
-      <a class="hero-button" href="<%= nextFocusHref %>">Open Appointment</a>
-    </div>
-  </section>
+  <div class="appointments-hero-scroll">
+    <% if (dashboardHeroCards.length === 0) { %>
+      <section class="mobile-hero-card">
+        <div class="hero-media">
+          <div class="hero-figure" aria-hidden="true"></div>
+        </div>
+        <div class="hero-body">
+          <p class="hero-eyebrow">No upcoming appointments</p>
+          <h3 class="hero-title">Add your next appointment</h3>
+          <p class="hero-meta">Plan your next visit.</p>
+          <p class="hero-location">Add a location to view nearby details.</p>
+          <a class="hero-button" href="/appointments/new">Create Appointment</a>
+        </div>
+      </section>
+    <% } %>
+    <% dashboardHeroCards.forEach((item) => { %>
+      <section
+        class="mobile-hero-card appointment-hero"
+        data-hero
+        data-title="<%= item.title %>"
+        data-date="<%= item.date %>"
+        data-time="<%= item.time %>"
+        data-location="<%= item.location || '' %>"
+        data-map="<%= item.mapQuery || '' %>"
+        data-link="/appointments/<%= item.id %>"
+      >
+        <div class="hero-media <%= item.mapEmbedUrl ? 'has-map' : '' %>">
+          <% if (item.mapEmbedUrl) { %>
+            <iframe
+              class="hero-map"
+              src="<%= item.mapEmbedUrl %>"
+              title="Appointment location map"
+              loading="lazy"
+              referrerpolicy="no-referrer-when-downgrade"
+            ></iframe>
+          <% } else { %>
+            <div class="hero-figure" aria-hidden="true"></div>
+          <% } %>
+        </div>
+        <div class="hero-body">
+          <p class="hero-eyebrow"><%= item.isPrimary ? "For Today" : "Upcoming" %></p>
+          <h3 class="hero-title"><%= item.title %></h3>
+          <p class="hero-meta"><%= item.date ? `${item.date} · ${to12Hour(item.time)}` : "Plan your next visit." %></p>
+          <p class="hero-location"><%= item.location || "Add a location to view nearby details." %></p>
+          <% if (item.mapEmbedUrl) { %>
+            <p class="hero-attribution">Map data © Google</p>
+          <% } %>
+          <a class="hero-button" href="/appointments/<%= item.id %>">Open Appointment</a>
+        </div>
+      </section>
+    <% }) %>
+  </div>
 
   <section class="mobile-section">
     <div class="mobile-section-header">
