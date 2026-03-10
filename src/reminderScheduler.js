@@ -7,8 +7,11 @@ const LOOKAHEAD_MINUTES = 180;
 const VOICE_RETRY_DELAY_MINUTES = 2;
 
 let schedulerStarted = false;
+let schedulerRunInProgress = false;
 let loggedMissingEnv = false;
 let loggedBaseUrlWarning = false;
+const resolvedTimezoneCache = new Map();
+const timezoneFormatterCache = new Map();
 
 const selectDueQueuedAttemptsStmt = db.prepare(
   `SELECT ra.*,
@@ -29,15 +32,6 @@ const selectDueQueuedAttemptsStmt = db.prepare(
    WHERE ra.status = 'queued'
      AND ra.scheduledFor <= ?
    ORDER BY ra.scheduledFor ASC, ra.id ASC`
-);
-
-const selectInitialAttemptStmt = db.prepare(
-  `SELECT id
-   FROM reminder_attempts
-   WHERE appointmentId = ?
-     AND channel = 'voice'
-     AND attemptNumber = 1
-   LIMIT 1`
 );
 
 const insertReminderAttemptStmt = db.prepare(
@@ -126,6 +120,7 @@ const selectUpcomingAppointmentsStmt = db.prepare(
           a.reminderMinutes,
           a.completedAt,
           u.phoneNumber AS userPhoneNumber,
+          u.timezone AS userTimezone,
           u.voiceEnabled AS userVoiceEnabled,
           u.smsEnabled AS userSmsEnabled,
           u.quietHoursStart AS userQuietHoursStart,
@@ -136,7 +131,59 @@ const selectUpcomingAppointmentsStmt = db.prepare(
      AND a.userId IS NOT NULL
      AND a.date >= ?
      AND a.date <= ?
-   ORDER BY a.date ASC, a.time ASC, a.id ASC`
+    ORDER BY a.date ASC, a.time ASC, a.id ASC`
+);
+
+const claimQueuedAttemptStmt = db.prepare(
+  `UPDATE reminder_attempts
+   SET status = 'calling',
+       updatedAt = @updatedAt
+   WHERE id = @id
+     AND status = 'queued'`
+);
+
+const insertInitialAttemptIfMissingStmt = db.prepare(
+  `INSERT INTO reminder_attempts
+    (userId, appointmentId, channel, attemptNumber, scheduledFor, startedAt, finishedAt, status, providerSid, errorCode, errorMessage, metadataJson, createdAt, updatedAt)
+   SELECT
+    @userId, @appointmentId, 'voice', 1, @scheduledFor, NULL, NULL, 'queued', NULL, NULL, NULL, @metadataJson, @createdAt, @updatedAt
+   WHERE NOT EXISTS (
+    SELECT 1
+    FROM reminder_attempts
+    WHERE appointmentId = @appointmentId
+      AND channel = 'voice'
+      AND attemptNumber = 1
+   )`
+);
+
+let selectChildAttemptByParentStmt;
+let selectChildAttemptByParentUsesJson = false;
+try {
+  selectChildAttemptByParentStmt = db.prepare(
+    `SELECT id
+     FROM reminder_attempts
+     WHERE channel = ?
+       AND json_valid(metadataJson) = 1
+       AND json_extract(metadataJson, '$.parentAttemptId') = ?
+     ORDER BY id DESC
+     LIMIT 1`
+  );
+  selectChildAttemptByParentUsesJson = true;
+} catch (error) {
+  selectChildAttemptByParentStmt = db.prepare(
+    `SELECT id
+     FROM reminder_attempts
+     WHERE channel = ?
+       AND metadataJson LIKE ?
+     ORDER BY id DESC
+     LIMIT 1`
+  );
+}
+
+const rescheduleAttemptStmt = db.prepare(
+  `UPDATE reminder_attempts
+   SET scheduledFor = ?, updatedAt = ?
+   WHERE id = ?`
 );
 
 function getTwilioConfig() {
@@ -195,9 +242,76 @@ function formatLocalDate(date) {
   ).padStart(2, "0")}`;
 }
 
-function parseAppointmentDateTime(appointment) {
-  const combined = `${appointment.date}T${appointment.time}:00`;
-  const parsed = new Date(combined);
+function isValidDateString(value) {
+  return /^\d{4}-\d{2}-\d{2}$/.test(String(value || "").trim());
+}
+
+function isValidTimeString(value) {
+  return /^([01]\d|2[0-3]):[0-5]\d$/.test(String(value || "").trim());
+}
+
+function resolveTimezone(timezone) {
+  const candidate = String(timezone || "").trim() || "UTC";
+  if (resolvedTimezoneCache.has(candidate)) {
+    return resolvedTimezoneCache.get(candidate);
+  }
+  try {
+    new Intl.DateTimeFormat("en-US", { timeZone: candidate });
+    resolvedTimezoneCache.set(candidate, candidate);
+    return candidate;
+  } catch (error) {
+    resolvedTimezoneCache.set(candidate, "UTC");
+    return "UTC";
+  }
+}
+
+function getDateTimePartsForTimezone(date, timezone) {
+  const resolvedTimezone = resolveTimezone(timezone);
+  let formatter = timezoneFormatterCache.get(resolvedTimezone);
+  if (!formatter) {
+    formatter = new Intl.DateTimeFormat("en-CA", {
+      timeZone: resolvedTimezone,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      hour12: false
+    });
+    timezoneFormatterCache.set(resolvedTimezone, formatter);
+  }
+  const parts = formatter.formatToParts(date);
+  const getPart = (type, fallback = "") => parts.find((part) => part.type === type)?.value || fallback;
+  return {
+    year: getPart("year", "1970"),
+    month: getPart("month", "01"),
+    day: getPart("day", "01"),
+    hour: getPart("hour", "00"),
+    minute: getPart("minute", "00"),
+    second: getPart("second", "00")
+  };
+}
+
+function parseDateTimeInTimezone(dateString, timeString, timezone) {
+  if (!isValidDateString(dateString) || !isValidTimeString(timeString)) {
+    return null;
+  }
+  const [year, month, day] = String(dateString).split("-").map(Number);
+  const [hour, minute] = String(timeString).split(":").map(Number);
+  const utcGuess = Date.UTC(year, month - 1, day, hour, minute, 0);
+  const offsetBaseDate = new Date(utcGuess);
+  const parts = getDateTimePartsForTimezone(offsetBaseDate, timezone);
+  const asIfUtc = Date.UTC(
+    Number.parseInt(parts.year, 10),
+    Number.parseInt(parts.month, 10) - 1,
+    Number.parseInt(parts.day, 10),
+    Number.parseInt(parts.hour, 10),
+    Number.parseInt(parts.minute, 10),
+    Number.parseInt(parts.second, 10)
+  );
+  const offsetMs = asIfUtc - utcGuess;
+  const parsed = new Date(utcGuess - offsetMs);
   if (Number.isNaN(parsed.getTime())) {
     return null;
   }
@@ -212,7 +326,7 @@ function getReminderOffsetMinutes(appointment) {
   return DEFAULT_REMINDER_OFFSET_MINUTES;
 }
 
-function isWithinQuietHours(now, quietHoursStart, quietHoursEnd) {
+function isWithinQuietHours(now, quietHoursStart, quietHoursEnd, timezone = "UTC") {
   const start = String(quietHoursStart || "").trim();
   const end = String(quietHoursEnd || "").trim();
   const valid = /^([01]\d|2[0-3]):[0-5]\d$/;
@@ -220,7 +334,8 @@ function isWithinQuietHours(now, quietHoursStart, quietHoursEnd) {
     return false;
   }
 
-  const minutesNow = now.getHours() * 60 + now.getMinutes();
+  const parts = getDateTimePartsForTimezone(now, timezone);
+  const minutesNow = Number.parseInt(parts.hour, 10) * 60 + Number.parseInt(parts.minute, 10);
   const [startHour, startMinute] = start.split(":").map(Number);
   const [endHour, endMinute] = end.split(":").map(Number);
   const startMinutes = startHour * 60 + startMinute;
@@ -235,7 +350,7 @@ function isWithinQuietHours(now, quietHoursStart, quietHoursEnd) {
   return minutesNow >= startMinutes || minutesNow < endMinutes;
 }
 
-function nextAllowedAfterQuietHours(now, quietHoursStart, quietHoursEnd) {
+function nextAllowedAfterQuietHours(now, quietHoursStart, quietHoursEnd, timezone = "UTC") {
   const start = String(quietHoursStart || "").trim();
   const end = String(quietHoursEnd || "").trim();
   const valid = /^([01]\d|2[0-3]):[0-5]\d$/;
@@ -243,14 +358,28 @@ function nextAllowedAfterQuietHours(now, quietHoursStart, quietHoursEnd) {
     return now;
   }
 
-  const [endHour, endMinute] = end.split(":").map(Number);
-  const next = new Date(now.getTime());
-  next.setSeconds(0, 0);
-  next.setHours(endHour, endMinute, 0, 0);
-  if (next <= now) {
-    next.setDate(next.getDate() + 1);
+  const tzParts = getDateTimePartsForTimezone(now, timezone);
+  const today = `${tzParts.year}-${tzParts.month}-${tzParts.day}`;
+  const candidate = parseDateTimeInTimezone(today, end, timezone);
+  if (!candidate) {
+    return now;
   }
-  return next;
+  if (candidate > now) {
+    return candidate;
+  }
+
+  const tomorrowDate = new Date(Date.UTC(
+    Number.parseInt(tzParts.year, 10),
+    Number.parseInt(tzParts.month, 10) - 1,
+    Number.parseInt(tzParts.day, 10) + 1,
+    0,
+    0,
+    0
+  ));
+  const tomorrow = `${tomorrowDate.getUTCFullYear()}-${String(tomorrowDate.getUTCMonth() + 1).padStart(2, "0")}-${String(
+    tomorrowDate.getUTCDate()
+  ).padStart(2, "0")}`;
+  return parseDateTimeInTimezone(tomorrow, end, timezone) || now;
 }
 
 function safeJsonParse(value, fallback = {}) {
@@ -274,16 +403,51 @@ function createAttemptRecord({
   status = "queued",
   metadata = null
 }) {
+  const parsedUserId = Number.parseInt(String(userId || ""), 10);
+  const normalizedChannel = String(channel || "").trim().toLowerCase();
+  const parsedAttemptNumber = Number.parseInt(String(attemptNumber || ""), 10);
+  const scheduled = new Date(String(scheduledFor || ""));
+  const normalizedStatus = String(status || "queued").trim().toLowerCase();
+  const allowedStatus = new Set([
+    "queued",
+    "calling",
+    "voice_no_answer",
+    "voice_failed",
+    "sms_sent",
+    "completed",
+    "cancelled"
+  ]);
+  if (!Number.isInteger(parsedUserId) || parsedUserId <= 0) {
+    console.error("[Twilio Reminders] Refusing to enqueue attempt with invalid user id.");
+    return null;
+  }
+  if (!["voice", "sms"].includes(normalizedChannel)) {
+    console.error("[Twilio Reminders] Refusing to enqueue attempt with invalid channel.");
+    return null;
+  }
+  if (!Number.isInteger(parsedAttemptNumber) || parsedAttemptNumber <= 0) {
+    console.error("[Twilio Reminders] Refusing to enqueue attempt with invalid attempt number.");
+    return null;
+  }
+  if (Number.isNaN(scheduled.getTime())) {
+    console.error("[Twilio Reminders] Refusing to enqueue attempt with invalid schedule time.");
+    return null;
+  }
+  if (!allowedStatus.has(normalizedStatus)) {
+    console.error("[Twilio Reminders] Refusing to enqueue attempt with invalid status.");
+    return null;
+  }
+
   const nowIso = new Date().toISOString();
   const payload = {
-    userId,
+    userId: parsedUserId,
     appointmentId: appointmentId || null,
-    channel,
-    attemptNumber,
-    scheduledFor,
+    channel: normalizedChannel,
+    attemptNumber: parsedAttemptNumber,
+    scheduledFor: scheduled.toISOString(),
     startedAt: null,
     finishedAt: null,
-    status,
+    status: normalizedStatus,
     providerSid: null,
     errorCode: null,
     errorMessage: null,
@@ -291,8 +455,15 @@ function createAttemptRecord({
     createdAt: nowIso,
     updatedAt: nowIso
   };
-  const inserted = insertReminderAttemptStmt.run(payload);
-  return inserted.lastInsertRowid;
+  try {
+    const inserted = insertReminderAttemptStmt.run(payload);
+    return inserted.lastInsertRowid;
+  } catch (error) {
+    if (String(error?.code || "") === "SQLITE_CONSTRAINT_UNIQUE") {
+      return null;
+    }
+    throw error;
+  }
 }
 
 function updateAttemptStatus(id, status, updates = {}) {
@@ -383,11 +554,38 @@ async function createSms(client, config, attempt) {
   });
 }
 
+function hasChildAttempt(attemptId, channel) {
+  const id = Number.parseInt(String(attemptId || ""), 10);
+  if (!id) {
+    return false;
+  }
+  const normalizedChannel = String(channel || "").trim().toLowerCase();
+  if (!["voice", "sms"].includes(normalizedChannel)) {
+    return false;
+  }
+  if (selectChildAttemptByParentUsesJson) {
+    return Boolean(selectChildAttemptByParentStmt.get(normalizedChannel, id));
+  }
+  const pattern = `%"parentAttemptId":${id}%`;
+  return Boolean(selectChildAttemptByParentStmt.get(normalizedChannel, pattern));
+}
+
+function claimQueuedAttempt(id) {
+  const result = claimQueuedAttemptStmt.run({
+    id,
+    updatedAt: new Date().toISOString()
+  });
+  return Number(result?.changes || 0) === 1;
+}
+
 function maybeQueueVoiceRetry(attempt, reason = "no_answer") {
   if (Number(attempt.userVoiceEnabled) !== 1) {
     return null;
   }
   if (attempt.attemptNumber >= 2) {
+    return null;
+  }
+  if (hasChildAttempt(attempt.id, "voice")) {
     return null;
   }
   const scheduledFor = new Date(Date.now() + VOICE_RETRY_DELAY_MINUTES * 60 * 1000).toISOString();
@@ -406,6 +604,9 @@ function maybeQueueVoiceRetry(attempt, reason = "no_answer") {
 
 function maybeQueueSmsFallback(attempt, reason = "voice_failed") {
   if (Number(attempt.userSmsEnabled) !== 1) {
+    return null;
+  }
+  if (hasChildAttempt(attempt.id, "sms")) {
     return null;
   }
   const scheduledFor = new Date().toISOString();
@@ -463,6 +664,10 @@ async function processQueuedAttempts() {
 
   const client = createTwilioClient(config);
   for (const attempt of dueAttempts) {
+    if (!claimQueuedAttempt(attempt.id)) {
+      continue;
+    }
+
     if (attempt.appointmentId && attempt.appointmentCompletedAt) {
       updateAttemptStatus(attempt.id, "cancelled", {
         finishedAt: new Date().toISOString(),
@@ -473,14 +678,16 @@ async function processQueuedAttempts() {
 
     const now = new Date();
     if (
-      isWithinQuietHours(now, attempt.userQuietHoursStart, attempt.userQuietHoursEnd)
+      isWithinQuietHours(now, attempt.userQuietHoursStart, attempt.userQuietHoursEnd, attempt.userTimezone)
     ) {
       const nextAllowed = nextAllowedAfterQuietHours(
         now,
         attempt.userQuietHoursStart,
-        attempt.userQuietHoursEnd
+        attempt.userQuietHoursEnd,
+        attempt.userTimezone
       );
       updateAttemptStatus(attempt.id, "queued", {
+        startedAt: null,
         metadata: {
           ...safeJsonParse(attempt.metadataJson),
           deferredFrom: attempt.scheduledFor,
@@ -488,7 +695,7 @@ async function processQueuedAttempts() {
           reason: "quiet_hours"
         }
       });
-      db.prepare("UPDATE reminder_attempts SET scheduledFor = ?, updatedAt = ? WHERE id = ?").run(
+      rescheduleAttemptStmt.run(
         nextAllowed.toISOString(),
         new Date().toISOString(),
         attempt.id
@@ -517,7 +724,8 @@ async function processQueuedAttempts() {
         const call = await createVoiceCall(client, config, attempt);
         updateAttemptStatus(attempt.id, "calling", {
           providerSid: call.sid,
-          startedAt: new Date().toISOString()
+          startedAt: new Date().toISOString(),
+          finishedAt: null
         });
         continue;
       }
@@ -547,13 +755,29 @@ async function processQueuedAttempts() {
 
 function getUpcomingAppointmentsForScheduling(now) {
   const horizon = new Date(now.getTime() + LOOKAHEAD_MINUTES * 60 * 1000);
-  const lowerDate = formatLocalDate(now);
-  const upperDate = formatLocalDate(horizon);
+  const lowerBound = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+  const upperBound = new Date(horizon.getTime() + 24 * 60 * 60 * 1000);
+  const lowerDate = formatLocalDate(lowerBound);
+  const upperDate = formatLocalDate(upperBound);
 
   return selectUpcomingAppointmentsStmt
     .all(lowerDate, upperDate)
+    .map((appointment) => {
+      const dateTime = parseDateTimeInTimezone(
+        appointment.date,
+        appointment.time,
+        appointment.userTimezone
+      );
+      if (!dateTime) {
+        return null;
+      }
+      return { ...appointment, _parsedAppointmentDateTime: dateTime };
+    })
     .filter((appointment) => {
-      const dateTime = parseAppointmentDateTime(appointment);
+      if (!appointment) {
+        return false;
+      }
+      const dateTime = appointment._parsedAppointmentDateTime;
       if (!dateTime) {
         return false;
       }
@@ -569,7 +793,13 @@ function queueInitialAttemptsForUpcomingAppointments() {
       continue;
     }
 
-    const appointmentDateTime = parseAppointmentDateTime(appointment);
+    const appointmentDateTime =
+      appointment._parsedAppointmentDateTime ||
+      parseDateTimeInTimezone(
+        appointment.date,
+        appointment.time,
+        appointment.userTimezone
+      );
     if (!appointmentDateTime) {
       continue;
     }
@@ -586,31 +816,39 @@ function queueInitialAttemptsForUpcomingAppointments() {
       continue;
     }
 
-    const existing = selectInitialAttemptStmt.get(appointment.id);
-    if (existing) {
-      continue;
-    }
-
-    createAttemptRecord({
-      userId: appointment.userId,
-      appointmentId: appointment.id,
-      channel: "voice",
-      attemptNumber: 1,
-      scheduledFor: remindAt.toISOString(),
-      metadata: {
-        source: "scheduler",
-        offsetMinutes
+    const nowIso = new Date().toISOString();
+    try {
+      insertInitialAttemptIfMissingStmt.run({
+        userId: appointment.userId,
+        appointmentId: appointment.id,
+        scheduledFor: remindAt.toISOString(),
+        metadataJson: JSON.stringify({
+          source: "scheduler",
+          offsetMinutes
+        }),
+        createdAt: nowIso,
+        updatedAt: nowIso
+      });
+    } catch (error) {
+      if (String(error?.code || "") !== "SQLITE_CONSTRAINT_UNIQUE") {
+        throw error;
       }
-    });
+    }
   }
 }
 
 async function processDueReminders() {
+  if (schedulerRunInProgress) {
+    return;
+  }
+  schedulerRunInProgress = true;
   try {
     queueInitialAttemptsForUpcomingAppointments();
     await processQueuedAttempts();
   } catch (error) {
     console.error("[Twilio Reminders] Scheduler error:", error.message);
+  } finally {
+    schedulerRunInProgress = false;
   }
 }
 
@@ -739,6 +977,13 @@ function handleVoiceStatusCallback(payload) {
     return {
       ok: false,
       message: "No matching reminder attempt."
+    };
+  }
+  if (["completed", "cancelled"].includes(String(attempt.status || "").toLowerCase())) {
+    return {
+      ok: true,
+      attemptId: attempt.id,
+      status: attempt.status
     };
   }
 

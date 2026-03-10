@@ -1,4 +1,3 @@
-const { describe, it, expect } = require("vitest");
 const { appointmentCreateSchema } = require("../src/validation/appointmentSchemas");
 
 describe("appointment schema", () => {

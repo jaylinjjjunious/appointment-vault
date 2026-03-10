@@ -150,6 +150,17 @@ router.get("/login", csrfProtection, (req, res) => {
   });
 });
 
+router.get("/register", csrfProtection, (req, res) => {
+  if (req.currentUser) {
+    res.redirect("/");
+    return;
+  }
+  renderAuthPage(res, "auth/register", {
+    title: "Create Account",
+    csrfToken: req.csrfToken()
+  });
+});
+
 router.post("/login", loginIpLimiter, loginEmailLimiter, csrfProtection, async (req, res, next) => {
   try {
     const parsed = loginSchema.safeParse(req.body || {});
@@ -182,12 +193,41 @@ router.post("/login", loginIpLimiter, loginEmailLimiter, csrfProtection, async (
   }
 });
 
-router.get("/register", (req, res) => {
-  res.redirect("/auth/login");
-});
+router.post("/register", registerLimiter, csrfProtection, async (req, res, next) => {
+  try {
+    const parsed = registerSchema.safeParse(req.body || {});
+    if (!parsed.success) {
+      const firstIssue = parsed.error.issues[0]?.message || "Enter a valid email and password.";
+      renderAuthPage(res.status(400), "auth/register", {
+        title: "Create Account",
+        error: firstIssue,
+        values: {
+          email: String(req.body?.email || ""),
+          displayName: String(req.body?.displayName || "")
+        },
+        csrfToken: req.csrfToken()
+      });
+      return;
+    }
 
-router.post("/register", (req, res) => {
-  res.redirect("/auth/login");
+    const user = await registerLocalUser(parsed.data);
+    await createSessionForUserAsync(req, user, "local");
+    res.redirect("/");
+  } catch (error) {
+    if (error?.publicMessage || error?.message) {
+      renderAuthPage(res.status(error?.statusCode || 400), "auth/register", {
+        title: "Create Account",
+        error: error.publicMessage || error.message,
+        values: {
+          email: String(req.body?.email || ""),
+          displayName: String(req.body?.displayName || "")
+        },
+        csrfToken: req.csrfToken ? req.csrfToken() : ""
+      });
+      return;
+    }
+    next(error);
+  }
 });
 
 router.post("/logout", ensureSameOrigin, (req, res) => {

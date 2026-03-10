@@ -1,6 +1,6 @@
-/* global localStorage */
 (() => {
   const STORAGE_KEY = "av:savedFilters";
+  const MAX_SAVED_FILTERS = 25;
 
   const safeParse = (raw) => {
     try {
@@ -21,10 +21,40 @@
 
   const save = (items) => {
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(items.slice(0, MAX_SAVED_FILTERS)));
     } catch (error) {
       // ignore
     }
+  };
+
+  const getFeedbackNode = () => {
+    const root = document.querySelector("[data-saved-filters]");
+    if (!root) return null;
+    let feedback = root.querySelector("[data-filter-feedback]");
+    if (!feedback) {
+      feedback = document.createElement("p");
+      feedback.className = "section-empty";
+      feedback.setAttribute("data-filter-feedback", "true");
+      root.prepend(feedback);
+    }
+    return feedback;
+  };
+
+  const setFeedback = (message, isError = false) => {
+    const feedback = getFeedbackNode();
+    if (!feedback) return;
+    feedback.textContent = message || "";
+    feedback.classList.toggle("error-text", Boolean(isError && message));
+    feedback.hidden = !message;
+  };
+
+  const areFiltersValid = (filters) => {
+    if (!filters) return false;
+    if (filters.dateFrom && filters.dateTo && filters.dateFrom > filters.dateTo) {
+      setFeedback("From date must be before To date.", true);
+      return false;
+    }
+    return true;
   };
 
   const render = () => {
@@ -77,7 +107,15 @@
     form.querySelector('[name="title"]').value = item.filters.title || "";
     form.querySelector('[name="dateFrom"]').value = item.filters.dateFrom || "";
     form.querySelector('[name="dateTo"]').value = item.filters.dateTo || "";
-    form.submit();
+    const nextFilters = getFiltersFromForm();
+    if (!areFiltersValid(nextFilters)) {
+      return;
+    }
+    setFeedback(`Applied "${item.name || "Saved filter"}".`);
+    if (window.location.pathname.startsWith("/appointments")) {
+      history.replaceState(null, "", "#list");
+    }
+    form.requestSubmit();
   };
 
   const deleteFilter = (id) => {
@@ -99,21 +137,46 @@
   document.addEventListener("DOMContentLoaded", () => {
     const saveBtn = document.querySelector("[data-save-filter]");
     const nameInput = document.querySelector("[data-filter-name]");
+    const form = document.querySelector("[data-filter-form]");
+    form?.addEventListener("submit", (event) => {
+      const filters = getFiltersFromForm();
+      if (!areFiltersValid(filters)) {
+        event.preventDefault();
+        return;
+      }
+      setFeedback("");
+    });
+
     if (saveBtn) {
       saveBtn.addEventListener("click", () => {
         const filters = getFiltersFromForm();
         if (!filters) return;
+        if (!areFiltersValid(filters)) return;
         const hasValues = Object.values(filters).some((value) => value);
-        if (!hasValues) return;
+        if (!hasValues) {
+          setFeedback("Enter at least one filter value before saving.", true);
+          return;
+        }
         const name = (nameInput && nameInput.value.trim()) || "Appointments filter";
+        const existing = load();
+        const duplicate = existing.find(
+          (item) =>
+            item.name === name &&
+            JSON.stringify(item.filters || {}) === JSON.stringify(filters)
+        );
+        if (duplicate) {
+          setFeedback("That filter is already saved.");
+          return;
+        }
         const item = {
           id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
           name,
           filters,
           createdAt: new Date().toISOString()
         };
-        save([item, ...load()]);
+        save([item, ...existing]);
         if (nameInput) nameInput.value = "";
+        setFeedback(`Saved "${name}".`);
         render();
       });
     }

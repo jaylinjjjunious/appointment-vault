@@ -229,7 +229,7 @@ const upsertAppSettingStatement = db.prepare(`
     value = excluded.value,
     updatedAt = excluded.updatedAt
 `);
-const deleteAppSettingStatement = db.prepare("DELETE FROM app_settings WHERE key = ?");
+const _deleteAppSettingStatement = db.prepare("DELETE FROM app_settings WHERE key = ?");
 const selectUserByIdStatement = db.prepare("SELECT * FROM users WHERE id = ?");
 const selectUserByEmailStatement = db.prepare("SELECT * FROM users WHERE LOWER(email) = LOWER(?) LIMIT 1");
 const selectUserGoogleTokensStatement = db.prepare("SELECT googleTokensJson FROM users WHERE id = ?");
@@ -282,6 +282,15 @@ const selectCheckinDocumentByIdStatement = db.prepare(
 const deleteCheckinDocumentStatement = db.prepare(
   "DELETE FROM checkin_documents WHERE id = ? AND userId = ?"
 );
+const deleteReminderCallsForAppointmentStatement = db.prepare(
+  "DELETE FROM reminder_calls WHERE appointmentId = ?"
+);
+const deleteReminderAttemptsForAppointmentStatement = db.prepare(
+  "DELETE FROM reminder_attempts WHERE appointmentId = ?"
+);
+const deleteOccurrenceCompletionsForAppointmentStatement = db.prepare(
+  "DELETE FROM appointment_occurrence_completions WHERE appointmentId = ?"
+);
 const insertOccurrenceCompletionStatement = db.prepare(
   `INSERT OR IGNORE INTO appointment_occurrence_completions
     (userId, appointmentId, occurrenceKey, completedAt, createdAt)
@@ -304,6 +313,15 @@ const selectAppointmentsForUserStatement = db.prepare(
    WHERE userId = ?
    ORDER BY date ASC, time ASC, id ASC`
 );
+const deleteAppointmentStatement = db.prepare(
+  "DELETE FROM appointments WHERE id = ? AND userId = ?"
+);
+const deleteAppointmentCascade = db.transaction((appointmentId, userId) => {
+  deleteReminderCallsForAppointmentStatement.run(appointmentId);
+  deleteReminderAttemptsForAppointmentStatement.run(appointmentId);
+  deleteOccurrenceCompletionsForAppointmentStatement.run(appointmentId);
+  return deleteAppointmentStatement.run(appointmentId, userId);
+});
 
 function buildAuthDebugSnapshot(req, res) {
   return {
@@ -2817,10 +2835,7 @@ app.post("/api/assistant/calendar", async (req, res, next) => {
         notes
       });
     } catch (error) {
-      db.prepare("DELETE FROM appointments WHERE id = ? AND userId = ?").run(
-        Number(insertInfo.lastInsertRowid),
-        user.id
-      );
+      deleteAppointmentCascade(Number(insertInfo.lastInsertRowid), user.id);
       throw error;
     }
 
@@ -2989,10 +3004,7 @@ app.post("/api/actions/appointments", async (req, res, next) => {
         notes
       });
     } catch (error) {
-      db.prepare("DELETE FROM appointments WHERE id = ? AND userId = ?").run(
-        Number(insertInfo.lastInsertRowid),
-        actionUser.id
-      );
+      deleteAppointmentCascade(Number(insertInfo.lastInsertRowid), actionUser.id);
       throw error;
     }
 
@@ -3369,7 +3381,7 @@ app.post("/appointments/:id/delete", async (req, res, next) => {
       return;
     }
 
-    db.prepare("DELETE FROM appointments WHERE id = ? AND userId = ?").run(id, user.id);
+    deleteAppointmentCascade(id, user.id);
     if (String(req.query.partial || "") === "1") {
       res.status(200).send("");
       return;

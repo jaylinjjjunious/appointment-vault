@@ -246,6 +246,7 @@ function buildOccurrencesForRule(baseDate, ruleValue, windowStart, windowEnd, ma
   const occurrences = [];
   const until = ruleValue.until || null;
   let generatedCount = 0;
+  let shouldStop = false;
 
   function pushOccurrence(candidate) {
     if (until && candidate > until) {
@@ -258,7 +259,11 @@ function buildOccurrencesForRule(baseDate, ruleValue, windowStart, windowEnd, ma
     if (candidate >= windowStart && candidate <= windowEnd) {
       occurrences.push(candidate);
     }
-    return occurrences.length < maxOccurrences;
+    if (occurrences.length >= maxOccurrences) {
+      shouldStop = true;
+      return false;
+    }
+    return true;
   }
 
   if (ruleValue.freq === "DAILY") {
@@ -273,6 +278,9 @@ function buildOccurrencesForRule(baseDate, ruleValue, windowStart, windowEnd, ma
         if (!keepGoing) {
           break;
         }
+      }
+      if (shouldStop) {
+        break;
       }
       cursor = addDays(cursor, ruleValue.interval);
       if (ruleValue.count && generatedCount >= ruleValue.count && cursor < windowStart) {
@@ -306,6 +314,9 @@ function buildOccurrencesForRule(baseDate, ruleValue, windowStart, windowEnd, ma
         if (!keepGoing) {
           break;
         }
+      }
+      if (shouldStop) {
+        break;
       }
 
       weekCursor = addDays(weekCursor, 7 * ruleValue.interval);
@@ -354,6 +365,9 @@ function buildOccurrencesForRule(baseDate, ruleValue, windowStart, windowEnd, ma
           break;
         }
       }
+      if (shouldStop) {
+        break;
+      }
 
       cursor = addMonths(cursor, ruleValue.interval);
       if (ruleValue.count && generatedCount >= ruleValue.count && cursor < windowStart) {
@@ -399,6 +413,9 @@ function buildOccurrencesForRule(baseDate, ruleValue, windowStart, windowEnd, ma
             break;
           }
         }
+      }
+      if (shouldStop) {
+        break;
       }
       cursor = addYears(cursor, ruleValue.interval);
       if (ruleValue.count && generatedCount >= ruleValue.count && cursor < windowStart) {
@@ -479,18 +496,30 @@ function estimateDurationMinutes(appointment) {
   return 60;
 }
 
-function overlapsSameDay(startTimeA, durationA, startTimeB, durationB) {
-  const [aHour, aMinute] = String(startTimeA || "00:00").split(":").map(Number);
-  const [bHour, bMinute] = String(startTimeB || "00:00").split(":").map(Number);
-  if (!Number.isInteger(aHour) || !Number.isInteger(aMinute)) {
+function _overlapsSameDay(startTimeA, durationA, startTimeB, durationB) {
+  const startA = parseTimeToMinutes(startTimeA);
+  const startB = parseTimeToMinutes(startTimeB);
+  if (startA === null || startB === null) {
     return false;
   }
-  if (!Number.isInteger(bHour) || !Number.isInteger(bMinute)) {
-    return false;
+  return overlapsByMinuteRange(startA, durationA, startB, durationB);
+}
+
+function parseTimeToMinutes(value) {
+  const [hourRaw, minuteRaw] = String(value || "00:00").split(":");
+  const hour = Number(hourRaw);
+  const minute = Number(minuteRaw);
+  if (!Number.isInteger(hour) || !Number.isInteger(minute)) {
+    return null;
   }
-  const startA = aHour * 60 + aMinute;
+  if (hour < 0 || hour > 23 || minute < 0 || minute > 59) {
+    return null;
+  }
+  return hour * 60 + minute;
+}
+
+function overlapsByMinuteRange(startA, durationA, startB, durationB) {
   const endA = startA + durationA;
-  const startB = bHour * 60 + bMinute;
   const endB = startB + durationB;
   return startA < endB && startB < endA;
 }
@@ -500,30 +529,61 @@ function detectConflicts(candidate, existing, windowStartDate, windowEndDate) {
     maxOccurrences: 500
   });
   const candidateDuration = estimateDurationMinutes(candidate);
+  const candidateWithMinutes = candidateOccurrences
+    .map((occurrence) => ({
+      ...occurrence,
+      startMinutes: parseTimeToMinutes(occurrence.time),
+      conflictKey: occurrence.occurrenceKey || `${occurrence.id}:${occurrence.date}T${occurrence.time}`
+    }))
+    .filter((occurrence) => occurrence.startMinutes !== null);
+  const candidateByDate = new Map();
+  for (const occurrence of candidateWithMinutes) {
+    const items = candidateByDate.get(occurrence.date);
+    if (items) {
+      items.push(occurrence);
+    } else {
+      candidateByDate.set(occurrence.date, [occurrence]);
+    }
+  }
+
   const conflicts = [];
+  const seenConflicts = new Set();
 
   for (const appointment of existing) {
     const existingOccurrences = buildOccurrenceItems(appointment, windowStartDate, windowEndDate, {
       maxOccurrences: 500
     });
     const existingDuration = estimateDurationMinutes(appointment);
+    const existingByDate = new Map();
+    for (const occurrence of existingOccurrences) {
+      existingByDate.set(occurrence.date, occurrence);
+    }
 
-    for (const left of candidateOccurrences) {
-      for (const right of existingOccurrences) {
-        if (left.date !== right.date) {
+    for (const [date, leftGroup] of candidateByDate.entries()) {
+      const right = existingByDate.get(date);
+      if (!right) {
+        continue;
+      }
+      const existingStartMinutes = parseTimeToMinutes(right.time);
+      if (existingStartMinutes === null) {
+        continue;
+      }
+      for (const left of leftGroup) {
+        if (!overlapsByMinuteRange(left.startMinutes, candidateDuration, existingStartMinutes, existingDuration)) {
           continue;
         }
-        if (
-          overlapsSameDay(left.time, candidateDuration, right.time, existingDuration)
-        ) {
-          conflicts.push({
-            candidateOccurrenceKey: left.occurrenceKey || `${left.id}:${left.date}T${left.time}`,
-            withAppointmentId: right.id,
-            withTitle: right.title,
-            date: left.date,
-            time: left.time
-          });
+        const key = `${left.conflictKey}|${right.id}`;
+        if (seenConflicts.has(key)) {
+          continue;
         }
+        seenConflicts.add(key);
+        conflicts.push({
+          candidateOccurrenceKey: left.conflictKey,
+          withAppointmentId: right.id,
+          withTitle: right.title,
+          date: left.date,
+          time: left.time
+        });
       }
     }
   }
@@ -539,4 +599,3 @@ module.exports = {
   buildOccurrenceItems,
   detectConflicts
 };
-

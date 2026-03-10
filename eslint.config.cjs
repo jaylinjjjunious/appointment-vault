@@ -34,8 +34,25 @@ module.exports = [
     files: ["src/public/**/*.js"],
     languageOptions: {
       globals: {
+        DOMParser: "readonly",
+        FormData: "readonly",
+        fetch: "readonly",
+        history: "readonly",
+        localStorage: "readonly",
+        navigator: "readonly",
+        requestAnimationFrame: "readonly",
         window: "readonly",
         document: "readonly"
+      }
+    }
+  },
+  {
+    files: ["test/**/*.js"],
+    languageOptions: {
+      globals: {
+        describe: "readonly",
+        expect: "readonly",
+        it: "readonly"
       }
     }
   }
