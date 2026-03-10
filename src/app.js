@@ -120,6 +120,15 @@ const {
   detectConflicts
 } = require("./recurrence");
 const { matchesAppointmentQuery } = require("./lib/search");
+const {
+  attachAutomationStatus,
+  getAppointmentAutomationStatusMap,
+  getUserAutomationView,
+  runAutomationLoginTest,
+  runAutomationSubmissionDryRun,
+  saveUserAutomationIntegration,
+  syncAutomationJobsForUser
+} = require("./automation/service");
 require("dotenv").config({ quiet: true });
 
 (() => {
@@ -1897,6 +1906,26 @@ async function buildDashboardData(userId, filters, options = {}) {
   };
 }
 
+function attachAutomationStatusesToDashboard(userId, dashboardData) {
+  const appointmentIds = [
+    ...(dashboardData?.appointments || []),
+    ...(dashboardData?.todayAppointments || []),
+    ...(dashboardData?.thisWeekAppointments || []),
+    ...(dashboardData?.upcomingAppointments || [])
+  ]
+    .map((appointment) => Number(appointment?.id || 0))
+    .filter((id) => Number.isInteger(id) && id > 0);
+  const statusMap = getAppointmentAutomationStatusMap(userId, appointmentIds);
+
+  return {
+    ...dashboardData,
+    appointments: attachAutomationStatus(dashboardData.appointments || [], statusMap),
+    todayAppointments: attachAutomationStatus(dashboardData.todayAppointments || [], statusMap),
+    thisWeekAppointments: attachAutomationStatus(dashboardData.thisWeekAppointments || [], statusMap),
+    upcomingAppointments: attachAutomationStatus(dashboardData.upcomingAppointments || [], statusMap)
+  };
+}
+
 app.get("/", (req, res) => {
   if (Object.keys(req.query || {}).length > 0) {
     const queryString = new URLSearchParams(req.query).toString();
@@ -1932,9 +1961,12 @@ app.get("/dashboard", async (req, res) => {
   };
 
   try {
-    const dashboardData = await buildDashboardData(user.id, filters, {
-      session: req.session || null
-    });
+    const dashboardData = attachAutomationStatusesToDashboard(
+      user.id,
+      await buildDashboardData(user.id, filters, {
+        session: req.session || null
+      })
+    );
     const googleStatusMessage =
       req.query.google === "connected"
         ? "Google Calendar connected."
@@ -2020,9 +2052,12 @@ app.get("/appointments", async (req, res) => {
   };
 
   try {
-    const dashboardData = await buildDashboardData(user.id, filters, {
-      session: req.session || null
-    });
+    const dashboardData = attachAutomationStatusesToDashboard(
+      user.id,
+      await buildDashboardData(user.id, filters, {
+        session: req.session || null
+      })
+    );
 
     const todoStatusMessage =
       req.query.todo === "created"
@@ -2117,9 +2152,12 @@ app.get("/partials/appointments-sections", async (req, res) => {
 
   const filters = normalizeDashboardFilters(req.query);
   try {
-    const dashboardData = await buildDashboardData(user.id, filters, {
-      session: req.session || null
-    });
+    const dashboardData = attachAutomationStatusesToDashboard(
+      user.id,
+      await buildDashboardData(user.id, filters, {
+        session: req.session || null
+      })
+    );
     res.render("partials/appointments-sections", dashboardData);
   } catch (error) {
     res.status(500).send("<p class=\"section-empty\">Unable to refresh appointments right now.</p>");
@@ -2156,6 +2194,17 @@ function renderSettingsPage(req, res, next) {
         : callStatus === "error"
           ? `Test call failed: ${String(req.query.error || "Unknown error")}`
           : "";
+    const automationStatus = String(req.query.automation || "");
+    const automationStatusMessage =
+      automationStatus === "saved"
+        ? "Automation settings saved."
+        : automationStatus === "login_ok"
+          ? "Automation login test passed."
+          : automationStatus === "dry_run_ok"
+            ? "Automation dry run passed."
+            : automationStatus === "error"
+              ? `Automation error: ${String(req.query.error || "Unknown error")}`
+              : "";
 
     res.render("settings", {
       title: "Settings",
@@ -2164,6 +2213,9 @@ function renderSettingsPage(req, res, next) {
       reminderActivity,
       reminderStatus,
       reminderChannel,
+      automation: getUserAutomationView(user.id),
+      automationStatus,
+      automationStatusMessage,
       query: req.query || {},
       callStatus,
       callStatusMessage
@@ -2398,6 +2450,61 @@ app.post("/settings/reminders", (req, res, next) => {
     res.redirect("/settings?prefs=saved");
   } catch (error) {
     next(error);
+  }
+});
+
+app.post("/settings/automation", (req, res, next) => {
+  try {
+    const user = requireCurrentUser(req, res);
+    if (!user) {
+      return;
+    }
+
+    saveUserAutomationIntegration(user.id, req.body || {});
+    syncAutomationJobsForUser(user.id);
+    res.redirect("/settings?automation=saved#automation");
+  } catch (error) {
+    res.redirect(
+      `/settings?automation=error&error=${encodeURIComponent(
+        error?.message || "Unable to save automation settings."
+      )}#automation`
+    );
+  }
+});
+
+app.post("/settings/automation/test-login", async (req, res) => {
+  const user = requireCurrentUser(req, res);
+  if (!user) {
+    return;
+  }
+
+  try {
+    await runAutomationLoginTest(user.id);
+    res.redirect("/settings?automation=login_ok#automation");
+  } catch (error) {
+    res.redirect(
+      `/settings?automation=error&error=${encodeURIComponent(
+        error?.message || "Automation login failed."
+      )}#automation`
+    );
+  }
+});
+
+app.post("/settings/automation/test-submit", async (req, res) => {
+  const user = requireCurrentUser(req, res);
+  if (!user) {
+    return;
+  }
+
+  try {
+    await runAutomationSubmissionDryRun(user.id);
+    res.redirect("/settings?automation=dry_run_ok#automation");
+  } catch (error) {
+    res.redirect(
+      `/settings?automation=error&error=${encodeURIComponent(
+        error?.message || "Automation dry run failed."
+      )}#automation`
+    );
   }
 });
 
@@ -2730,6 +2837,7 @@ app.post("/agent/save", async (req, res, next) => {
       console.error("Google Calendar sync failed:", error.message);
     }
 
+    syncAutomationJobsForUser(user.id);
     res.redirect("/dashboard");
   } catch (error) {
     next(error);
@@ -3382,6 +3490,7 @@ app.post("/appointments/:id", async (req, res, next) => {
       updatedAt: new Date().toISOString()
     });
 
+    syncAutomationJobsForUser(user.id);
     res.redirect(`/appointments/${id}`);
   } catch (error) {
     next(error);
@@ -3403,6 +3512,7 @@ app.post("/appointments/:id/delete", async (req, res, next) => {
     }
 
     deleteAppointmentCascade(id, user.id);
+    syncAutomationJobsForUser(user.id);
     if (String(req.query.partial || "") === "1") {
       res.status(200).send("");
       return;
@@ -3436,6 +3546,7 @@ app.post("/api/appointments/:id/complete-occurrence", (req, res, next) => {
     const occurrenceKey = occurrenceKeyRaw || createOccurrenceKey(appointment);
     const nowIso = new Date().toISOString();
     insertOccurrenceCompletionStatement.run(user.id, id, occurrenceKey, nowIso, nowIso);
+    syncAutomationJobsForUser(user.id);
 
     if (requestPrefersJson(req)) {
       res.json({ ok: true, appointmentId: id, occurrenceKey });
@@ -3473,6 +3584,7 @@ app.post("/api/appointments/:id/complete-series", (req, res, next) => {
        SET completedAt = ?, updatedAt = ?
        WHERE id = ? AND userId = ?`
     ).run(nowIso, nowIso, id, user.id);
+    syncAutomationJobsForUser(user.id);
 
     if (requestPrefersJson(req)) {
       res.json({ ok: true, appointmentId: id });
@@ -3515,6 +3627,7 @@ function completeAppointment(req, res, next) {
         nowIso
       );
       const referer = String(req.get("referer") || "").trim();
+      syncAutomationJobsForUser(user.id);
       if (referer.includes("/settings")) {
         res.redirect("/settings");
         return;
@@ -3535,6 +3648,7 @@ function completeAppointment(req, res, next) {
       completedAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     });
+    syncAutomationJobsForUser(user.id);
 
     const referer = String(req.get("referer") || "").trim();
     if (referer.includes("/settings")) {

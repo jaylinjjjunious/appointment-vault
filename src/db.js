@@ -12,6 +12,8 @@ fs.mkdirSync(path.dirname(dbPath), { recursive: true });
 const db = new Database(dbPath);
 
 db.pragma("journal_mode = WAL");
+db.pragma("foreign_keys = ON");
+db.pragma("busy_timeout = 5000");
 
 db.exec(`
   CREATE TABLE IF NOT EXISTS users (
@@ -134,6 +136,10 @@ if (!userColumnNames.includes("isActive")) {
   db.exec("ALTER TABLE users ADD COLUMN isActive INTEGER NOT NULL DEFAULT 1");
 }
 
+if (!userColumnNames.includes("googleTokensJson")) {
+  db.exec("ALTER TABLE users ADD COLUMN googleTokensJson TEXT");
+}
+
 db.exec(`
   CREATE TABLE IF NOT EXISTS reminder_calls (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -191,9 +197,31 @@ db.exec(`
 `);
 
 db.exec(`
+  CREATE UNIQUE INDEX IF NOT EXISTS idx_reminder_attempts_voice_unique
+  ON reminder_attempts (appointmentId, channel, attemptNumber)
+  WHERE appointmentId IS NOT NULL AND channel = 'voice'
+`);
+
+db.exec(`
+  CREATE INDEX IF NOT EXISTS idx_reminder_attempts_provider_sid
+  ON reminder_attempts (providerSid)
+  WHERE providerSid IS NOT NULL
+`);
+
+db.exec(`
   CREATE INDEX IF NOT EXISTS idx_reminder_attempts_user
   ON reminder_attempts (userId, createdAt DESC)
 `);
+
+try {
+  db.exec(`
+    CREATE INDEX IF NOT EXISTS idx_reminder_attempts_parent_attempt
+    ON reminder_attempts (channel, json_extract(metadataJson, '$.parentAttemptId'), id DESC)
+    WHERE metadataJson IS NOT NULL AND json_valid(metadataJson) = 1
+  `);
+} catch (error) {
+  // JSON extension may be unavailable in some SQLite builds.
+}
 
 db.exec(`
   CREATE TABLE IF NOT EXISTS appointment_occurrence_completions (
@@ -216,6 +244,16 @@ db.exec(`
 db.exec(`
   CREATE INDEX IF NOT EXISTS idx_appointments_user_date_time
   ON appointments (userId, date, time, id)
+`);
+
+db.exec(`
+  CREATE INDEX IF NOT EXISTS idx_appointments_open_by_date_time
+  ON appointments (completedAt, date, time, userId, id)
+`);
+
+db.exec(`
+  CREATE INDEX IF NOT EXISTS idx_occurrence_completion_user_appointment
+  ON appointment_occurrence_completions (userId, appointmentId, occurrenceKey)
 `);
 
 db.exec(`
@@ -244,6 +282,75 @@ db.exec(`
 db.exec(`
   CREATE INDEX IF NOT EXISTS idx_checkin_documents_user
   ON checkin_documents (userId, createdAt DESC)
+`);
+
+db.exec(`
+  CREATE TABLE IF NOT EXISTS automation_integrations (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    userId INTEGER NOT NULL,
+    siteId TEXT NOT NULL,
+    targetName TEXT NOT NULL,
+    enabled INTEGER NOT NULL DEFAULT 0,
+    encryptedUsername TEXT,
+    encryptedPassword TEXT,
+    scheduleLeadMinutes INTEGER NOT NULL DEFAULT 60,
+    lastRunStatus TEXT,
+    lastRunAt TEXT,
+    lastSuccessAt TEXT,
+    failureCount INTEGER NOT NULL DEFAULT 0,
+    lastFailureMessage TEXT,
+    createdAt TEXT NOT NULL,
+    updatedAt TEXT NOT NULL,
+    FOREIGN KEY (userId) REFERENCES users(id)
+  )
+`);
+
+db.exec(`
+  CREATE UNIQUE INDEX IF NOT EXISTS idx_automation_integrations_user_site
+  ON automation_integrations (userId, siteId)
+`);
+
+db.exec(`
+  CREATE INDEX IF NOT EXISTS idx_automation_integrations_enabled
+  ON automation_integrations (siteId, enabled, updatedAt DESC)
+`);
+
+db.exec(`
+  CREATE TABLE IF NOT EXISTS automation_submission_jobs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    userId INTEGER NOT NULL,
+    appointmentId INTEGER NOT NULL,
+    siteId TEXT NOT NULL,
+    scheduledFor TEXT NOT NULL,
+    claimedAt TEXT,
+    claimedBy TEXT,
+    status TEXT NOT NULL CHECK (status IN ('pending', 'running', 'succeeded', 'failed', 'cancelled')),
+    attemptCount INTEGER NOT NULL DEFAULT 0,
+    externalReference TEXT,
+    failureMessage TEXT,
+    auditLog TEXT,
+    snapshotPath TEXT,
+    createdAt TEXT NOT NULL,
+    updatedAt TEXT NOT NULL,
+    completedAt TEXT,
+    FOREIGN KEY (userId) REFERENCES users(id),
+    FOREIGN KEY (appointmentId) REFERENCES appointments(id)
+  )
+`);
+
+db.exec(`
+  CREATE UNIQUE INDEX IF NOT EXISTS idx_automation_jobs_unique_source
+  ON automation_submission_jobs (userId, appointmentId, siteId)
+`);
+
+db.exec(`
+  CREATE INDEX IF NOT EXISTS idx_automation_jobs_due
+  ON automation_submission_jobs (siteId, status, scheduledFor, id)
+`);
+
+db.exec(`
+  CREATE INDEX IF NOT EXISTS idx_automation_jobs_user_created
+  ON automation_submission_jobs (userId, siteId, createdAt DESC)
 `);
 
 module.exports = db;

@@ -30,6 +30,9 @@
             <% if (appointment.isExternalGoogle) { %>
               <p><span class="tag">Google event</span></p>
             <% } %>
+            <% if (appointment.automationStatus) { %>
+              <p><span class="tag">Automation: <%= appointment.automationStatus.status %></span></p>
+            <% } %>
             <p><strong>Date:</strong> <%= appointment.date %></p>
             <p><strong>Time:</strong> <%= to12Hour(appointment.time) %></p>
             <% if (appointment.location) { %>
@@ -93,6 +96,7 @@
           <div class="week-col week-col-title">
             <strong><%= appointment.title %></strong>
             <% if (appointment.isExternalGoogle) { %> <span class="tag">Google</span><% } %>
+            <% if (appointment.automationStatus) { %> <span class="tag"><%= appointment.automationStatus.status %></span><% } %>
           </div>
           <div class="week-col"><%= appointment.date %></div>
           <div class="week-col"><%= to12Hour(appointment.time) %></div>
@@ -148,6 +152,9 @@
             <h3><strong><%= appointment.title %></strong></h3>
             <% if (appointment.isExternalGoogle) { %>
               <p><span class="tag">Google event</span></p>
+            <% } %>
+            <% if (appointment.automationStatus) { %>
+              <p><span class="tag">Automation: <%= appointment.automationStatus.status %></span></p>
             <% } %>
             <p><strong>Date:</strong> <%= appointment.date %></p>
             <p><strong>Time:</strong> <%= to12Hour(appointment.time) %></p>

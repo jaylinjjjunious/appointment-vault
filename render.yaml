@@ -32,9 +32,85 @@ services:
         sync: false
       - key: GOOGLE_REDIRECT_URI
         sync: false
+      - key: AUTOMATION_SECRET_KEY
+        sync: false
+      - key: AUTOMATION_TARGET_NAME
+        sync: false
+      - key: AUTOMATION_TARGET_LOGIN_URL
+        sync: false
+      - key: AUTOMATION_TARGET_FORM_URL
+        sync: false
+      - key: AUTOMATION_USERNAME_SELECTOR
+        sync: false
+      - key: AUTOMATION_PASSWORD_SELECTOR
+        sync: false
+      - key: AUTOMATION_LOGIN_SUBMIT_SELECTOR
+        sync: false
+      - key: AUTOMATION_AUTH_CHECK_SELECTOR
+        sync: false
+      - key: AUTOMATION_SUBMIT_SELECTOR
+        sync: false
+      - key: AUTOMATION_SUCCESS_SELECTOR
+        sync: false
+      - key: AUTOMATION_SUCCESS_URL_CONTAINS
+        sync: false
+      - key: AUTOMATION_FIELD_MAP_JSON
+        sync: false
+      - key: PLAYWRIGHT_HEADLESS
+        value: "true"
+      - key: AUTOMATION_WORKER_INTERVAL_MS
+        value: "60000"
       - key: TWILIO_ACCOUNT_SID
         sync: false
       - key: TWILIO_AUTH_TOKEN
         sync: false
       - key: TWILIO_FROM_NUMBER
         sync: false
+  - type: worker
+    name: appointment-vault-automation
+    env: node
+    plan: free
+    autoDeploy: true
+    buildCommand: npm install
+    startCommand: npm run worker:automation
+    disk:
+      name: data
+      mountPath: /var/data
+      sizeGB: 1
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATA_DIR
+        value: /var/data
+      - key: APP_TIMEZONE
+        value: America/Los_Angeles
+      - key: SESSION_SECRET
+        sync: false
+      - key: AUTOMATION_SECRET_KEY
+        sync: false
+      - key: AUTOMATION_TARGET_NAME
+        sync: false
+      - key: AUTOMATION_TARGET_LOGIN_URL
+        sync: false
+      - key: AUTOMATION_TARGET_FORM_URL
+        sync: false
+      - key: AUTOMATION_USERNAME_SELECTOR
+        sync: false
+      - key: AUTOMATION_PASSWORD_SELECTOR
+        sync: false
+      - key: AUTOMATION_LOGIN_SUBMIT_SELECTOR
+        sync: false
+      - key: AUTOMATION_AUTH_CHECK_SELECTOR
+        sync: false
+      - key: AUTOMATION_SUBMIT_SELECTOR
+        sync: false
+      - key: AUTOMATION_SUCCESS_SELECTOR
+        sync: false
+      - key: AUTOMATION_SUCCESS_URL_CONTAINS
+        sync: false
+      - key: AUTOMATION_FIELD_MAP_JSON
+        sync: false
+      - key: PLAYWRIGHT_HEADLESS
+        value: "true"
+      - key: AUTOMATION_WORKER_INTERVAL_MS
+        value: "60000"

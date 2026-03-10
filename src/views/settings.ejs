@@ -21,6 +21,9 @@
       : { items: [], page: 1, pageSize: 20, total: 0 };
   const safeReminderStatus = typeof reminderStatus === "string" ? reminderStatus : "";
   const safeReminderChannel = typeof reminderChannel === "string" ? reminderChannel : "";
+  const safeAutomation = typeof automation !== "undefined" && automation ? automation : null;
+  const safeAutomationStatus = typeof automationStatus === "string" ? automationStatus : "";
+  const safeAutomationStatusMessage = typeof automationStatusMessage === "string" ? automationStatusMessage : "";
   const hasSavedPrefs = String((typeof query !== "undefined" && query ? query.prefs : "") || "") === "saved";
 %>
 
@@ -39,6 +42,7 @@
     <a class="tab tab-active" href="#overview" data-tab="overview">Overview</a>
     <a class="tab" href="#appointments" data-tab="appointments">Appointments</a>
     <a class="tab" href="#checkin" data-tab="checkin">Check-In</a>
+    <a class="tab" href="#automation" data-tab="automation">Automation</a>
     <a class="tab" href="#activity" data-tab="activity">Activity</a>
     <a class="tab" href="#history" data-tab="history">History</a>
     <a class="tab" href="#errors" data-tab="errors">Error Finder</a>
@@ -167,6 +171,116 @@
       Open In New Tab
     </a>
   </div>
+</section>
+
+<section id="automation" class="calendar-section glass-panel" data-tab-panel="automation">
+  <h2>Website Automation</h2>
+  <% if (safeAutomationStatusMessage) { %>
+    <p class="<%= safeAutomationStatus === 'error' ? 'error-text' : '' %>"><%= safeAutomationStatusMessage %></p>
+  <% } %>
+  <% if (!safeAutomation || !safeAutomation.configured) { %>
+    <p class="section-empty">
+      Automation is not fully configured on this server.
+      <% if (safeAutomation && safeAutomation.missingConfigKeys && safeAutomation.missingConfigKeys.length > 0) { %>
+        Missing: <code><%= safeAutomation.missingConfigKeys.join(", ") %></code>
+      <% } %>
+    </p>
+  <% } else { %>
+    <p class="section-empty">
+      Connect <strong><%= safeAutomation.targetName %></strong> and schedule automatic form submission from your saved appointments.
+    </p>
+    <form class="form-grid" action="/settings/automation" method="POST">
+      <label class="checkbox-field" for="automationEnabled">
+        <input
+          id="automationEnabled"
+          name="enabled"
+          type="checkbox"
+          value="true"
+          <%= safeAutomation.enabled ? "checked" : "" %>
+        />
+        <span>Enable automatic website submission</span>
+      </label>
+      <div class="form-row">
+        <div class="form-field">
+          <label for="automationUsername">Website Username</label>
+          <input id="automationUsername" class="glass-input" name="username" type="text" placeholder="<%= safeAutomation.hasStoredCredentials ? 'Stored securely' : 'username' %>" />
+        </div>
+        <div class="form-field">
+          <label for="automationPassword">Website Password</label>
+          <input id="automationPassword" class="glass-input" name="password" type="password" placeholder="<%= safeAutomation.hasStoredCredentials ? 'Stored securely' : 'password' %>" />
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-field">
+          <label for="scheduleLeadMinutes">Run Minutes Before Appointment</label>
+          <input
+            id="scheduleLeadMinutes"
+            class="glass-input"
+            name="scheduleLeadMinutes"
+            type="number"
+            min="0"
+            value="<%= safeAutomation.scheduleLeadMinutes || 60 %>"
+          />
+        </div>
+        <label class="checkbox-field" for="clearSavedCredentials">
+          <input id="clearSavedCredentials" name="clearSavedCredentials" type="checkbox" value="true" />
+          <span>Clear saved credentials</span>
+        </label>
+      </div>
+      <div class="actions">
+        <button class="button glass-button" type="submit">Save Automation Settings</button>
+      </div>
+    </form>
+
+    <div class="actions" style="margin-top: 1rem;">
+      <form action="/settings/automation/test-login" method="POST">
+        <button class="button glass-button button-secondary" type="submit">Test Login</button>
+      </form>
+      <form action="/settings/automation/test-submit" method="POST">
+        <button class="button glass-button button-secondary" type="submit">Dry Run Form Fill</button>
+      </form>
+    </div>
+
+    <div class="list" style="margin-top: 1rem;">
+      <article class="card glass-card appointment-card">
+        <div class="appointment-main">
+          <p><strong>Stored Credentials:</strong> <%= safeAutomation.hasStoredCredentials ? "Yes" : "No" %></p>
+          <p><strong>Enabled:</strong> <%= safeAutomation.enabled ? "Yes" : "No" %></p>
+          <p><strong>Next Run:</strong> <%= safeAutomation.nextRunAt || "Not scheduled" %></p>
+          <p><strong>Last Run:</strong> <%= safeAutomation.lastRunAt || "Never" %></p>
+          <p><strong>Last Success:</strong> <%= safeAutomation.lastSuccessAt || "Never" %></p>
+          <p><strong>Last Status:</strong> <%= safeAutomation.lastRunStatus || "idle" %></p>
+          <% if (safeAutomation.lastFailureMessage) { %>
+            <p class="error-text"><strong>Last Failure:</strong> <%= safeAutomation.lastFailureMessage %></p>
+          <% } %>
+        </div>
+      </article>
+    </div>
+
+    <h3 style="margin-top: 1rem;">Recent Automation Jobs</h3>
+    <% if (!safeAutomation.jobs || safeAutomation.jobs.length === 0) { %>
+      <p class="section-empty">No automation jobs yet.</p>
+    <% } else { %>
+      <div class="list">
+        <% safeAutomation.jobs.forEach((job) => { %>
+          <article class="card glass-card appointment-card">
+            <div class="appointment-main">
+              <p><strong>Appointment ID:</strong> <%= job.appointmentId %></p>
+              <p><strong>Status:</strong> <%= job.status %></p>
+              <p><strong>Scheduled:</strong> <%= job.scheduledFor %></p>
+              <p><strong>Attempts:</strong> <%= job.attemptCount %></p>
+              <% if (job.externalReference) { %>
+                <p><strong>Reference:</strong> <%= job.externalReference %></p>
+              <% } %>
+              <% if (job.failureMessage) { %>
+                <p class="error-text"><strong>Error:</strong> <%= job.failureMessage %></p>
+              <% } %>
+            </div>
+          </article>
+        <% }) %>
+      </div>
+    <% } %>
+  <% } %>
 </section>
 
 <section id="activity" class="calendar-section glass-panel" data-tab-panel="activity">
