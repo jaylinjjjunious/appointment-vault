@@ -15,6 +15,16 @@ class GoogleCalendarError extends Error {
   }
 }
 
+function resolveTimezone(timezone) {
+  const candidate = String(timezone || "").trim() || "UTC";
+  try {
+    new Intl.DateTimeFormat("en-US", { timeZone: candidate });
+    return candidate;
+  } catch (error) {
+    throw new GoogleCalendarError(`Invalid timezone: ${candidate}`);
+  }
+}
+
 function getGoogleConfig() {
   return {
     clientId: String(process.env.GOOGLE_CLIENT_ID || "").trim(),
@@ -53,6 +63,12 @@ async function createCalendarEvent({ title, start, end, timezone, notes }) {
 
   if (!safeTitle || !safeStart || !safeEnd || !safeTimezone) {
     throw new GoogleCalendarError("createCalendarEvent requires title, start, end, and timezone.");
+  }
+  resolveTimezone(safeTimezone);
+  const startDate = new Date(safeStart);
+  const endDate = new Date(safeEnd);
+  if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime()) || endDate <= startDate) {
+    throw new GoogleCalendarError("createCalendarEvent requires a valid start/end range.");
   }
 
   const calendar = getCalendarClientFromEnv();
@@ -149,14 +165,25 @@ function clearGoogleSession(session) {
   }
 }
 
-function getGoogleAuthUrl() {
+function getGoogleAuthUrl(state = "") {
   const oauth2Client = getOAuth2Client();
-  return oauth2Client.generateAuthUrl({
-    access_type: "offline",
-    scope: SCOPES,
-    prompt: "consent",
-    include_granted_scopes: true
-  });
+  const authUrl = new URL(
+    oauth2Client.generateAuthUrl({
+      access_type: "offline",
+      scope: SCOPES,
+      prompt: "consent",
+      include_granted_scopes: true
+    })
+  );
+  const normalizedState = String(state || "").trim();
+
+  if (normalizedState) {
+    // Force the state parameter onto the final URL so the callback can validate it
+    // even if upstream URL generation drops it.
+    authUrl.searchParams.set("state", normalizedState);
+  }
+
+  return authUrl.toString();
 }
 
 function parseJwtPayload(token) {
@@ -202,6 +229,39 @@ function extractGoogleIdentityFromTokens(tokens) {
   };
 }
 
+async function resolveGoogleIdentityFromTokens(tokens) {
+  const directIdentity = extractGoogleIdentityFromTokens(tokens);
+  if (directIdentity) {
+    return directIdentity;
+  }
+
+  const accessToken = String(tokens?.access_token || "").trim();
+  if (!accessToken) {
+    return null;
+  }
+
+  try {
+    const oauth2Client = getOAuth2Client();
+    oauth2Client.setCredentials({ access_token: accessToken });
+    const oauth2 = google.oauth2({ version: "v2", auth: oauth2Client });
+    const response = await oauth2.userinfo.get();
+    const profile = response?.data || {};
+    const providerUserId = String(profile.id || "").trim();
+    if (!providerUserId) {
+      return null;
+    }
+
+    return {
+      provider: "google",
+      providerUserId,
+      email: String(profile.email || "").trim() || null,
+      displayName: String(profile.name || "").trim() || null
+    };
+  } catch (error) {
+    return null;
+  }
+}
+
 async function exchangeCodeForTokens(code) {
   const oauth2Client = getOAuth2Client();
 
@@ -223,7 +283,11 @@ async function exchangeCodeForTokens(code) {
 }
 
 function getLocalTimezone() {
-  return Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+  return resolveTimezone(
+    String(process.env.DEFAULT_TIMEZONE || process.env.APP_TIMEZONE || "").trim() ||
+      Intl.DateTimeFormat().resolvedOptions().timeZone ||
+      "UTC"
+  );
 }
 
 function formatLocalDate(date) {
@@ -302,11 +366,17 @@ function parseLocalDateTime(dateValue, timeValue) {
   }
 
   if (date && time) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !/^([01]\d|2[0-3]):[0-5]\d$/.test(time)) {
+      return null;
+    }
     const parsed = new Date(`${date}T${time}:00`);
     return Number.isNaN(parsed.getTime()) ? null : parsed;
   }
 
   if (date && !time) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      return null;
+    }
     const parsed = new Date(`${date}T09:00:00`);
     return Number.isNaN(parsed.getTime()) ? null : parsed;
   }
@@ -629,6 +699,9 @@ async function findGoogleCalendarConflict(session, date, time, durationMinutes =
 
   const normalizedDate = String(date || "").trim();
   const normalizedTime = String(time || "").trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(normalizedDate) || !/^([01]\d|2[0-3]):[0-5]\d$/.test(normalizedTime)) {
+    throw new GoogleCalendarError("Invalid date/time provided for Google conflict lookup.");
+  }
   const meetingMinutes = Number.parseInt(String(durationMinutes || "30"), 10);
   const safeDurationMinutes =
     Number.isInteger(meetingMinutes) && meetingMinutes > 0 ? meetingMinutes : 30;
@@ -808,6 +881,7 @@ module.exports = {
   getGoogleAuthUrl,
   exchangeCodeForTokens,
   extractGoogleIdentityFromTokens,
+  resolveGoogleIdentityFromTokens,
   setGoogleTokensOnSession,
   clearGoogleSession,
   createCalendarEvent,
