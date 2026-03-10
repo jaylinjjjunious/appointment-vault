@@ -1,6 +1,6 @@
 async function main() {
   const fs = require("node:fs");
-  const { resolveChromiumExecutablePath } = require("../src/automation/playwrightExecutable");
+  const { ensureChromiumExecutablePath } = require("../src/automation/playwrightExecutable");
   let playwright = null;
   try {
     playwright = require("playwright");
@@ -9,7 +9,10 @@ async function main() {
     process.exit(1);
   }
 
-  const executablePath = resolveChromiumExecutablePath(playwright, process.env.PLAYWRIGHT_EXECUTABLE_PATH);
+  const executablePath = ensureChromiumExecutablePath(
+    playwright,
+    process.env.PLAYWRIGHT_EXECUTABLE_PATH
+  );
   const launchOptions = {
     headless: true,
     executablePath
