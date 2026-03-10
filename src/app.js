@@ -1541,11 +1541,6 @@ function buildTodayVoiceMessage(userId, requestedAppointmentId, now = new Date()
 }
 
 app.get("/auth/google", async (req, res, next) => {
-  if (TEST_PROFILE_ENABLED) {
-    res.redirect("/dashboard?google=test_profile");
-    return;
-  }
-
   if (!hasGoogleConfig()) {
     res.status(400).render("error", {
       title: "Google Not Configured",
@@ -1677,11 +1672,6 @@ app.get("/auth/google/callback", async (req, res, next) => {
 });
 
 app.post("/auth/google/disconnect", (req, res) => {
-  if (TEST_PROFILE_ENABLED) {
-    res.redirect("/dashboard?google=test_profile");
-    return;
-  }
-
   clearGoogleSession(req.session);
   if (req.currentUser?.id) {
     clearPersistedGoogleTokens(req.currentUser.id);
