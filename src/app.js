@@ -178,11 +178,6 @@ const runtimeEnv = env || fallbackEnv;
 const SESSION_SECRET = process.env.SESSION_SECRET || "appointment-vault-session-secret-change-me";
 const IS_PRODUCTION = process.env.NODE_ENV === "production";
 const AUTH_REQUIRED = runtimeEnv.app.authRequired;
-const TEST_PROFILE_ENABLED = ["1", "true", "yes", "on"].includes(
-  String(process.env.TEMP_TEST_PROFILE || process.env.TEST_PROFILE_ENABLED || "")
-    .trim()
-    .toLowerCase()
-);
 const TEST_PROFILE_NAME =
   String(process.env.TEST_PROFILE_NAME || "").trim() || "Temporary Test Profile";
 const TEST_PROFILE_EMAIL =
@@ -403,14 +398,6 @@ app.use((req, res, next) => {
 });
 installSecurity(app);
 app.use((req, res, next) => {
-  if (TEST_PROFILE_ENABLED) {
-    req.session.testProfile = {
-      name: TEST_PROFILE_NAME,
-      email: TEST_PROFILE_EMAIL,
-      role: "tester"
-    };
-  }
-
   next();
 });
 app.use((req, res, next) => {
@@ -422,7 +409,7 @@ app.use((req, res, next) => {
   try {
     let user = null;
 
-    if (TEST_PROFILE_ENABLED && req.session?.testProfile) {
+    if (req.session?.testProfile) {
       const testIdentity = {
         provider: "test",
         providerUserId: String(req.session.testProfile.email || TEST_PROFILE_EMAIL)
@@ -526,7 +513,7 @@ app.use((req, res, next) => {
   const hasRealGoogleConnection =
     isGoogleConnected(req.session) || Boolean(req.persistedGoogleTokens);
   const testProfile = req.session?.testProfile || null;
-  const testProfileActive = Boolean(TEST_PROFILE_ENABLED && testProfile);
+  const testProfileActive = Boolean(testProfile);
 
   res.locals.googleConfigured = hasGoogleConfig() || testProfileActive;
   res.locals.googleConnected =
