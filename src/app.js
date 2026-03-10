@@ -119,6 +119,7 @@ const {
   buildOccurrenceItems,
   detectConflicts
 } = require("./recurrence");
+const { pickDashboardHero } = require("./lib/dashboardHero");
 const { matchesAppointmentQuery } = require("./lib/search");
 const {
   attachAutomationStatus,
@@ -2002,11 +2003,13 @@ app.get("/dashboard", async (req, res) => {
       todoItems = [];
     }
 
-    const nextFocus =
-      dashboardData.todayAppointments.find((appointment) => !appointment.isCompleted) ||
-      dashboardData.thisWeekAppointments.find((appointment) => !appointment.isCompleted) ||
-      dashboardData.upcomingAppointments.find((appointment) => !appointment.isCompleted) ||
-      null;
+    const nextFocus = pickDashboardHero({
+      appointments: dashboardData.appointments,
+      todayAppointments: dashboardData.todayAppointments,
+      thisWeekAppointments: dashboardData.thisWeekAppointments,
+      upcomingAppointments: dashboardData.upcomingAppointments,
+      todoItems
+    }).item;
     const nextLocationQuery = String(nextFocus?.location || "").trim();
     let nextLocationResult = null;
     if (nextLocationQuery) {
