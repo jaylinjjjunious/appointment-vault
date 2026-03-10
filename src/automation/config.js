@@ -2,6 +2,17 @@ const path = require("node:path");
 
 const DEFAULT_SITE_ID = "external-form";
 const DEFAULT_TARGET_NAME = "External Form";
+const CE_CHECK_IN_SITE_ID = "ce-check-in";
+const CE_CHECK_IN_DEFAULTS = {
+  targetName: "Ce Check-In",
+  loginUrl: "https://www.cecheckin.com/client/account/signin",
+  usernameSelector: 'input[name="Pin"]',
+  passwordSelector: 'input[name="Password"]',
+  loginSubmitSelector: "button.btn.btn-primary.btn-lg.btn-block",
+  authCheckSelector: "#signOutForm",
+  submitSelector: "a.btn.btn-primary.btn-checkin",
+  successUrlContains: "/client"
+};
 
 function parseInteger(value, fallback) {
   const parsed = Number.parseInt(String(value || ""), 10);
@@ -41,19 +52,35 @@ function getDataDir() {
 }
 
 function getAutomationConfig() {
+  const siteId =
+    String(process.env.AUTOMATION_TARGET_SITE_ID || DEFAULT_SITE_ID).trim() || DEFAULT_SITE_ID;
+  const ceDefaults = siteId === CE_CHECK_IN_SITE_ID ? CE_CHECK_IN_DEFAULTS : null;
+
   return {
-    siteId: String(process.env.AUTOMATION_TARGET_SITE_ID || DEFAULT_SITE_ID).trim() || DEFAULT_SITE_ID,
+    siteId,
     targetName:
-      String(process.env.AUTOMATION_TARGET_NAME || DEFAULT_TARGET_NAME).trim() || DEFAULT_TARGET_NAME,
-    loginUrl: String(process.env.AUTOMATION_TARGET_LOGIN_URL || "").trim(),
+      String(process.env.AUTOMATION_TARGET_NAME || ceDefaults?.targetName || DEFAULT_TARGET_NAME).trim() ||
+      ceDefaults?.targetName ||
+      DEFAULT_TARGET_NAME,
+    loginUrl: String(process.env.AUTOMATION_TARGET_LOGIN_URL || ceDefaults?.loginUrl || "").trim(),
     formUrl: String(process.env.AUTOMATION_TARGET_FORM_URL || "").trim(),
-    usernameSelector: String(process.env.AUTOMATION_USERNAME_SELECTOR || "").trim(),
-    passwordSelector: String(process.env.AUTOMATION_PASSWORD_SELECTOR || "").trim(),
-    loginSubmitSelector: String(process.env.AUTOMATION_LOGIN_SUBMIT_SELECTOR || "").trim(),
-    authCheckSelector: String(process.env.AUTOMATION_AUTH_CHECK_SELECTOR || "").trim(),
-    submitSelector: String(process.env.AUTOMATION_SUBMIT_SELECTOR || "").trim(),
+    usernameSelector: String(
+      process.env.AUTOMATION_USERNAME_SELECTOR || ceDefaults?.usernameSelector || ""
+    ).trim(),
+    passwordSelector: String(
+      process.env.AUTOMATION_PASSWORD_SELECTOR || ceDefaults?.passwordSelector || ""
+    ).trim(),
+    loginSubmitSelector: String(
+      process.env.AUTOMATION_LOGIN_SUBMIT_SELECTOR || ceDefaults?.loginSubmitSelector || ""
+    ).trim(),
+    authCheckSelector: String(
+      process.env.AUTOMATION_AUTH_CHECK_SELECTOR || ceDefaults?.authCheckSelector || ""
+    ).trim(),
+    submitSelector: String(process.env.AUTOMATION_SUBMIT_SELECTOR || ceDefaults?.submitSelector || "").trim(),
     successSelector: String(process.env.AUTOMATION_SUCCESS_SELECTOR || "").trim(),
-    successUrlContains: String(process.env.AUTOMATION_SUCCESS_URL_CONTAINS || "").trim(),
+    successUrlContains: String(
+      process.env.AUTOMATION_SUCCESS_URL_CONTAINS || ceDefaults?.successUrlContains || ""
+    ).trim(),
     fieldMap: parseJsonObject(process.env.AUTOMATION_FIELD_MAP_JSON),
     questionnaireAnswers: parseJsonObject(process.env.AUTOMATION_QUESTIONNAIRE_ANSWERS_JSON),
     contactLine1: String(process.env.AUTOMATION_CONTACT_LINE1 || "").trim(),
@@ -99,6 +126,8 @@ function hasAutomationTargetConfig(config = getAutomationConfig()) {
 }
 
 module.exports = {
+  CE_CHECK_IN_DEFAULTS,
+  CE_CHECK_IN_SITE_ID,
   DEFAULT_SITE_ID,
   DEFAULT_TARGET_NAME,
   getAutomationConfig,

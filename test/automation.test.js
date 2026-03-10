@@ -49,4 +49,26 @@ describe("automation helpers", () => {
     expect(missing).toContain("AUTOMATION_QUESTIONNAIRE_ANSWERS_JSON");
     expect(missing).not.toContain("AUTOMATION_FIELD_MAP_JSON");
   });
+
+  it("uses built-in auth selector defaults for ce check-in", () => {
+    const { getAutomationConfig } = require("../src/automation/config");
+    const previous = {
+      AUTOMATION_TARGET_SITE_ID: process.env.AUTOMATION_TARGET_SITE_ID,
+      AUTOMATION_AUTH_CHECK_SELECTOR: process.env.AUTOMATION_AUTH_CHECK_SELECTOR,
+      AUTOMATION_LOGIN_SUBMIT_SELECTOR: process.env.AUTOMATION_LOGIN_SUBMIT_SELECTOR
+    };
+
+    process.env.AUTOMATION_TARGET_SITE_ID = "ce-check-in";
+    delete process.env.AUTOMATION_AUTH_CHECK_SELECTOR;
+    delete process.env.AUTOMATION_LOGIN_SUBMIT_SELECTOR;
+
+    const config = getAutomationConfig();
+
+    expect(config.authCheckSelector).toBe("#signOutForm");
+    expect(config.loginSubmitSelector).toBe("button.btn.btn-primary.btn-lg.btn-block");
+
+    process.env.AUTOMATION_TARGET_SITE_ID = previous.AUTOMATION_TARGET_SITE_ID;
+    process.env.AUTOMATION_AUTH_CHECK_SELECTOR = previous.AUTOMATION_AUTH_CHECK_SELECTOR;
+    process.env.AUTOMATION_LOGIN_SUBMIT_SELECTOR = previous.AUTOMATION_LOGIN_SUBMIT_SELECTOR;
+  });
 });
