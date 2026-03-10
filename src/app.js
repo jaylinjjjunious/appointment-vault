@@ -130,7 +130,7 @@ const {
   getUserAutomationView,
   completeMonthlyPhotoHandoff,
   saveUserAutomationIntegration,
-  startMonthlyPhotoHandoff,
+  startMonthlyPhotoHandoffPrep,
   startAutomationLoginTest,
   startAutomationSubmissionDryRun,
   syncAutomationJobsForUser
@@ -2539,7 +2539,7 @@ app.post("/settings/automation/photo-start", (req, res) => {
   }
 
   try {
-    startMonthlyPhotoHandoff(user.id);
+    startMonthlyPhotoHandoffPrep(user.id);
     res.redirect("/settings?automation=photo_handoff_started#automation");
   } catch (error) {
     res.redirect(

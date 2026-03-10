@@ -757,6 +757,22 @@ const claimDuePhotoHandoff = db.transaction(() => {
   return selectPhotoHandoffByIdStatement.get(nextHandoff.id) || null;
 });
 
+const claimPhotoHandoffById = db.transaction((handoffId) => {
+  const nowIso = new Date().toISOString();
+  const existing = selectPhotoHandoffByIdStatement.get(handoffId);
+  if (!existing || String(existing.status || "") !== "pending") {
+    return null;
+  }
+  const result = claimDuePhotoHandoffStatement.run({
+    id: handoffId,
+    updatedAt: nowIso
+  });
+  if (result.changes !== 1) {
+    return null;
+  }
+  return selectPhotoHandoffByIdStatement.get(handoffId) || null;
+});
+
 function updateIntegrationRunStatus(userId, status, failureMessage = "", successAt = null) {
   const integration = getUserAutomationIntegrationRow(userId);
   if (!integration) {
@@ -1026,6 +1042,7 @@ function startMonthlyPhotoHandoff(userId) {
     message: "Monthly photo handoff queued.",
     resumeUrl: null
   });
+  return selectPhotoHandoffByIdStatement.get(handoff.id) || handoff;
 }
 
 function completeMonthlyPhotoHandoff(userId, handoffId) {
@@ -1054,6 +1071,128 @@ function completeMonthlyPhotoHandoff(userId, handoffId) {
   });
 }
 
+async function processPhotoHandoff(handoff, config) {
+  const integration = getUserAutomationIntegrationRow(handoff.userId);
+  const nowIso = new Date().toISOString();
+  const run = createRunObservers(handoff.userId, "Queued monthly photo handoff");
+
+  if (
+    !integration ||
+    Number(integration.enabled) !== 1 ||
+    Number(integration.monthlyPhotoEnabled) !== 1
+  ) {
+    updatePhotoHandoffStatement.run({
+      id: handoff.id,
+      scheduledFor: null,
+      status: "cancelled",
+      checkpoint: handoff.checkpoint || null,
+      resumeUrl: handoff.resumeUrl || null,
+      failureMessage: "Monthly photo handoff is no longer enabled.",
+      notificationSent: Number(handoff.notificationSent || 0),
+      completedAt: nowIso,
+      updatedAt: nowIso
+    });
+    updateIntegrationHandoffState(handoff.userId, {
+      status: "cancelled",
+      at: nowIso,
+      completedAt: nowIso,
+      message: "Monthly photo handoff was cancelled.",
+      resumeUrl: handoff.resumeUrl || null
+    });
+    return;
+  }
+
+  try {
+    updateIntegrationHandoffState(handoff.userId, {
+      status: "preparing",
+      at: nowIso,
+      completedAt: null,
+      message: "Preparing the monthly photo handoff.",
+      resumeUrl: null
+    });
+    const result = await withTimeout(
+      runPhotoHandoffPrep(handoff.userId, handoff.id, {
+        onProgress: (message) => run.onProgress(message),
+        onSnapshot: (snapshotPath) => run.onSnapshot(snapshotPath)
+      }),
+      Math.max(config.timeoutMs * 9, 180000),
+      "Monthly photo handoff"
+    );
+    const user = selectUserContactForHandoffStatement.get(handoff.userId) || null;
+    let reminderSent = false;
+    try {
+      reminderSent = await sendPhotoHandoffReminder(
+        user,
+        { ...handoff, resumeUrl: result?.resumeUrl || handoff.resumeUrl || null },
+        integration
+      );
+    } catch (error) {
+      run.onProgress(`Photo reminder email skipped: ${error?.message || "Unknown error"}`);
+    }
+    updatePhotoHandoffStatement.run({
+      id: handoff.id,
+      scheduledFor: null,
+      status: "waiting_for_user",
+      checkpoint: result?.checkpoint || "photo_capture_required",
+      resumeUrl: result?.resumeUrl || handoff.resumeUrl || null,
+      failureMessage: null,
+      notificationSent: reminderSent ? 1 : Number(handoff.notificationSent || 0),
+      completedAt: null,
+      updatedAt: new Date().toISOString()
+    });
+    run.onComplete("Monthly photo handoff is ready for you", result?.snapshotPath || null);
+    updateIntegrationHandoffState(handoff.userId, {
+      status: "waiting_for_user",
+      at: nowIso,
+      completedAt: null,
+      message: reminderSent
+        ? "Photo step is ready. We emailed you a reminder too."
+        : "Photo step is ready. Open the website and take the photo to finish.",
+      resumeUrl: result?.resumeUrl || handoff.resumeUrl || null
+    });
+  } catch (error) {
+    run.onFailure(
+      error?.message || "Monthly photo handoff failed.",
+      error?.artifacts?.screenshotPath || null
+    );
+    updatePhotoHandoffStatement.run({
+      id: handoff.id,
+      scheduledFor: null,
+      status: "failed",
+      checkpoint: handoff.checkpoint || null,
+      resumeUrl: handoff.resumeUrl || null,
+      failureMessage: error?.message || "Monthly photo handoff failed.",
+      notificationSent: Number(handoff.notificationSent || 0),
+      completedAt: nowIso,
+      updatedAt: nowIso
+    });
+    updateIntegrationHandoffState(handoff.userId, {
+      status: "failed",
+      at: nowIso,
+      completedAt: nowIso,
+      message: error?.message || "Monthly photo handoff failed.",
+      resumeUrl: handoff.resumeUrl || null
+    });
+  }
+}
+
+function startMonthlyPhotoHandoffPrep(userId) {
+  const queued = startMonthlyPhotoHandoff(userId);
+  const handoffId = queued?.id;
+  if (!handoffId) {
+    return null;
+  }
+  const config = getAutomationConfig();
+  runDetached(async () => {
+    const claimed = claimPhotoHandoffById(handoffId);
+    if (!claimed) {
+      return;
+    }
+    await processPhotoHandoff(claimed, config);
+  });
+  return handoffId;
+}
+
 async function runAutomationWorkerCycle(options = {}) {
   const config = getAutomationConfig();
   if (!hasAutomationTargetConfig(config) || !hasAutomationSecretKey()) {
@@ -1078,105 +1217,7 @@ async function runAutomationWorkerCycle(options = {}) {
       break;
     }
     processed += 1;
-    const integration = getUserAutomationIntegrationRow(handoff.userId);
-    const nowIso = new Date().toISOString();
-    const run = createRunObservers(handoff.userId, "Queued monthly photo handoff");
-
-    if (
-      !integration ||
-      Number(integration.enabled) !== 1 ||
-      Number(integration.monthlyPhotoEnabled) !== 1
-    ) {
-      updatePhotoHandoffStatement.run({
-        id: handoff.id,
-        scheduledFor: null,
-        status: "cancelled",
-        checkpoint: handoff.checkpoint || null,
-        resumeUrl: handoff.resumeUrl || null,
-        failureMessage: "Monthly photo handoff is no longer enabled.",
-        notificationSent: Number(handoff.notificationSent || 0),
-        completedAt: nowIso,
-        updatedAt: nowIso
-      });
-      updateIntegrationHandoffState(handoff.userId, {
-        status: "cancelled",
-        at: nowIso,
-        completedAt: nowIso,
-        message: "Monthly photo handoff was cancelled.",
-        resumeUrl: handoff.resumeUrl || null
-      });
-      continue;
-    }
-
-    try {
-      updateIntegrationHandoffState(handoff.userId, {
-        status: "preparing",
-        at: nowIso,
-        completedAt: null,
-        message: "Preparing the monthly photo handoff.",
-        resumeUrl: null
-      });
-      const result = await withTimeout(
-        runPhotoHandoffPrep(handoff.userId, handoff.id, {
-          onProgress: (message) => run.onProgress(message),
-          onSnapshot: (snapshotPath) => run.onSnapshot(snapshotPath)
-        }),
-        Math.max(config.timeoutMs * 9, 180000),
-        "Monthly photo handoff"
-      );
-      const user = selectUserContactForHandoffStatement.get(handoff.userId) || null;
-      let reminderSent = false;
-      try {
-        reminderSent = await sendPhotoHandoffReminder(
-          user,
-          { ...handoff, resumeUrl: result?.resumeUrl || handoff.resumeUrl || null },
-          integration
-        );
-      } catch (error) {
-        run.onProgress(`Photo reminder email skipped: ${error?.message || "Unknown error"}`);
-      }
-      updatePhotoHandoffStatement.run({
-        id: handoff.id,
-        scheduledFor: null,
-        status: "waiting_for_user",
-        checkpoint: result?.checkpoint || "photo_capture_required",
-        resumeUrl: result?.resumeUrl || handoff.resumeUrl || null,
-        failureMessage: null,
-        notificationSent: reminderSent ? 1 : Number(handoff.notificationSent || 0),
-        completedAt: null,
-        updatedAt: new Date().toISOString()
-      });
-      run.onComplete("Monthly photo handoff is ready for you", result?.snapshotPath || null);
-      updateIntegrationHandoffState(handoff.userId, {
-        status: "waiting_for_user",
-        at: nowIso,
-        completedAt: null,
-        message: reminderSent
-          ? "Photo step is ready. We emailed you a reminder too."
-          : "Photo step is ready. Open the website and take the photo to finish.",
-        resumeUrl: result?.resumeUrl || handoff.resumeUrl || null
-      });
-    } catch (error) {
-      run.onFailure(error?.message || "Monthly photo handoff failed.", error?.artifacts?.screenshotPath || null);
-      updatePhotoHandoffStatement.run({
-        id: handoff.id,
-        scheduledFor: null,
-        status: "failed",
-        checkpoint: handoff.checkpoint || null,
-        resumeUrl: handoff.resumeUrl || null,
-        failureMessage: error?.message || "Monthly photo handoff failed.",
-        notificationSent: Number(handoff.notificationSent || 0),
-        completedAt: nowIso,
-        updatedAt: nowIso
-      });
-      updateIntegrationHandoffState(handoff.userId, {
-        status: "failed",
-        at: nowIso,
-        completedAt: nowIso,
-        message: error?.message || "Monthly photo handoff failed.",
-        resumeUrl: handoff.resumeUrl || null
-      });
-    }
+    await processPhotoHandoff(handoff, config);
   }
 
   for (;;) {
@@ -1301,6 +1342,7 @@ module.exports = {
   runAutomationWorkerCycle,
   saveUserAutomationIntegration,
   startAutomationLoginTest,
+  startMonthlyPhotoHandoffPrep,
   startAutomationSubmissionDryRun,
   startMonthlyPhotoHandoff,
   completeMonthlyPhotoHandoff,
