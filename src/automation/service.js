@@ -515,6 +515,58 @@ function updateIntegrationRunStatus(userId, status, failureMessage = "", success
   );
 }
 
+function runDetached(promiseFactory) {
+  setTimeout(() => {
+    Promise.resolve()
+      .then(() => promiseFactory())
+      .catch((error) => {
+        console.error("[automation] detached run failed:", error?.message || error);
+      });
+  }, 0);
+}
+
+function startAutomationLoginTest(userId) {
+  const integration = getUserAutomationIntegrationRow(userId);
+  if (!integration) {
+    throw new Error("Save automation settings first.");
+  }
+
+  updateIntegrationRunStatus(userId, "running", "Automation login test in progress.");
+  runDetached(async () => {
+    try {
+      await runAutomationLoginTest(userId);
+      updateIntegrationRunStatus(userId, "succeeded", "", new Date().toISOString());
+    } catch (error) {
+      updateIntegrationRunStatus(
+        userId,
+        "failed",
+        error?.message || "Automation login failed."
+      );
+    }
+  });
+}
+
+function startAutomationSubmissionDryRun(userId) {
+  const integration = getUserAutomationIntegrationRow(userId);
+  if (!integration) {
+    throw new Error("Save automation settings first.");
+  }
+
+  updateIntegrationRunStatus(userId, "running", "Automation dry run in progress.");
+  runDetached(async () => {
+    try {
+      await runAutomationSubmissionDryRun(userId);
+      updateIntegrationRunStatus(userId, "succeeded", "", new Date().toISOString());
+    } catch (error) {
+      updateIntegrationRunStatus(
+        userId,
+        "failed",
+        error?.message || "Automation dry run failed."
+      );
+    }
+  });
+}
+
 async function runAutomationWorkerCycle(options = {}) {
   const config = getAutomationConfig();
   if (!hasAutomationTargetConfig(config) || !hasAutomationSecretKey()) {
@@ -622,5 +674,7 @@ module.exports = {
   runAutomationSubmissionDryRun,
   runAutomationWorkerCycle,
   saveUserAutomationIntegration,
+  startAutomationLoginTest,
+  startAutomationSubmissionDryRun,
   syncAutomationJobsForUser
 };

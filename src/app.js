@@ -126,9 +126,9 @@ const {
   attachAutomationStatus,
   getAppointmentAutomationStatusMap,
   getUserAutomationView,
-  runAutomationLoginTest,
-  runAutomationSubmissionDryRun,
   saveUserAutomationIntegration,
+  startAutomationLoginTest,
+  startAutomationSubmissionDryRun,
   syncAutomationJobsForUser
 } = require("./automation/service");
 require("dotenv").config({ quiet: true });
@@ -2159,16 +2159,20 @@ function renderSettingsPage(req, res, next) {
           ? `Test call failed: ${String(req.query.error || "Unknown error")}`
           : "";
     const automationStatus = String(req.query.automation || "");
-    const automationStatusMessage =
-      automationStatus === "saved"
-        ? "Automation settings saved."
-        : automationStatus === "login_ok"
-          ? "Automation login test passed."
-          : automationStatus === "dry_run_ok"
-            ? "Automation dry run passed."
-            : automationStatus === "error"
-              ? `Automation error: ${String(req.query.error || "Unknown error")}`
-              : "";
+      const automationStatusMessage =
+        automationStatus === "saved"
+          ? "Automation settings saved."
+          : automationStatus === "login_ok"
+            ? "Automation login test passed."
+            : automationStatus === "login_started"
+              ? "Automation login test started. Refresh this page in a moment to see the result."
+            : automationStatus === "dry_run_ok"
+              ? "Automation dry run passed."
+              : automationStatus === "dry_run_started"
+                ? "Automation dry run started. Refresh this page in a moment to see the result."
+              : automationStatus === "error"
+                ? `Automation error: ${String(req.query.error || "Unknown error")}`
+                : "";
 
     res.render("settings", {
       title: "Settings",
@@ -2443,8 +2447,8 @@ app.post("/settings/automation/test-login", async (req, res) => {
   }
 
   try {
-    await runAutomationLoginTest(user.id);
-    res.redirect("/settings?automation=login_ok#automation");
+    startAutomationLoginTest(user.id);
+    res.redirect("/settings?automation=login_started#automation");
   } catch (error) {
     res.redirect(
       `/settings?automation=error&error=${encodeURIComponent(
@@ -2461,8 +2465,8 @@ app.post("/settings/automation/test-submit", async (req, res) => {
   }
 
   try {
-    await runAutomationSubmissionDryRun(user.id);
-    res.redirect("/settings?automation=dry_run_ok#automation");
+    startAutomationSubmissionDryRun(user.id);
+    res.redirect("/settings?automation=dry_run_started#automation");
   } catch (error) {
     res.redirect(
       `/settings?automation=error&error=${encodeURIComponent(
