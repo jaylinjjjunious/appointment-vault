@@ -4,7 +4,7 @@ services:
     env: node
     plan: free
     autoDeploy: true
-    buildCommand: npm install
+    buildCommand: npm install && npx playwright install chromium
     startCommand: npm start
     healthCheckPath: /health
     disk:
@@ -74,6 +74,8 @@ services:
         sync: false
       - key: PLAYWRIGHT_HEADLESS
         value: "true"
+      - key: PLAYWRIGHT_BROWSERS_PATH
+        value: /opt/render/.cache/ms-playwright
       - key: AUTOMATION_WORKER_INTERVAL_MS
         value: "60000"
       - key: TWILIO_ACCOUNT_SID
@@ -87,7 +89,7 @@ services:
     env: node
     plan: free
     autoDeploy: true
-    buildCommand: npm install
+    buildCommand: npm install && npx playwright install chromium
     startCommand: npm run worker:automation
     disk:
       name: data
@@ -144,5 +146,7 @@ services:
         sync: false
       - key: PLAYWRIGHT_HEADLESS
         value: "true"
+      - key: PLAYWRIGHT_BROWSERS_PATH
+        value: /opt/render/.cache/ms-playwright
       - key: AUTOMATION_WORKER_INTERVAL_MS
         value: "60000"
