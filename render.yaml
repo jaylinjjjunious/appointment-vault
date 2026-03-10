@@ -34,6 +34,8 @@ services:
         sync: false
       - key: AUTOMATION_SECRET_KEY
         sync: false
+      - key: AUTOMATION_TARGET_SITE_ID
+        sync: false
       - key: AUTOMATION_TARGET_NAME
         sync: false
       - key: AUTOMATION_TARGET_LOGIN_URL
@@ -55,6 +57,20 @@ services:
       - key: AUTOMATION_SUCCESS_URL_CONTAINS
         sync: false
       - key: AUTOMATION_FIELD_MAP_JSON
+        sync: false
+      - key: AUTOMATION_QUESTIONNAIRE_ANSWERS_JSON
+        sync: false
+      - key: AUTOMATION_CONTACT_LINE1
+        sync: false
+      - key: AUTOMATION_CONTACT_LINE2
+        sync: false
+      - key: AUTOMATION_CONTACT_CITY
+        sync: false
+      - key: AUTOMATION_CONTACT_STATE
+        sync: false
+      - key: AUTOMATION_CONTACT_ZIP
+        sync: false
+      - key: AUTOMATION_UPDATE_MAILING_ADDRESS
         sync: false
       - key: PLAYWRIGHT_HEADLESS
         value: "true"
@@ -88,6 +104,8 @@ services:
         sync: false
       - key: AUTOMATION_SECRET_KEY
         sync: false
+      - key: AUTOMATION_TARGET_SITE_ID
+        sync: false
       - key: AUTOMATION_TARGET_NAME
         sync: false
       - key: AUTOMATION_TARGET_LOGIN_URL
@@ -109,6 +127,20 @@ services:
       - key: AUTOMATION_SUCCESS_URL_CONTAINS
         sync: false
       - key: AUTOMATION_FIELD_MAP_JSON
+        sync: false
+      - key: AUTOMATION_QUESTIONNAIRE_ANSWERS_JSON
+        sync: false
+      - key: AUTOMATION_CONTACT_LINE1
+        sync: false
+      - key: AUTOMATION_CONTACT_LINE2
+        sync: false
+      - key: AUTOMATION_CONTACT_CITY
+        sync: false
+      - key: AUTOMATION_CONTACT_STATE
+        sync: false
+      - key: AUTOMATION_CONTACT_ZIP
+        sync: false
+      - key: AUTOMATION_UPDATE_MAILING_ADDRESS
         sync: false
       - key: PLAYWRIGHT_HEADLESS
         value: "true"

@@ -55,6 +55,13 @@ function getAutomationConfig() {
     successSelector: String(process.env.AUTOMATION_SUCCESS_SELECTOR || "").trim(),
     successUrlContains: String(process.env.AUTOMATION_SUCCESS_URL_CONTAINS || "").trim(),
     fieldMap: parseJsonObject(process.env.AUTOMATION_FIELD_MAP_JSON),
+    questionnaireAnswers: parseJsonObject(process.env.AUTOMATION_QUESTIONNAIRE_ANSWERS_JSON),
+    contactLine1: String(process.env.AUTOMATION_CONTACT_LINE1 || "").trim(),
+    contactLine2: String(process.env.AUTOMATION_CONTACT_LINE2 || "").trim(),
+    contactCity: String(process.env.AUTOMATION_CONTACT_CITY || "").trim(),
+    contactState: String(process.env.AUTOMATION_CONTACT_STATE || "").trim(),
+    contactZip: String(process.env.AUTOMATION_CONTACT_ZIP || "").trim(),
+    updateMailingAddress: parseBoolean(process.env.AUTOMATION_UPDATE_MAILING_ADDRESS, false),
     headless: parseBoolean(process.env.PLAYWRIGHT_HEADLESS, true),
     timeoutMs: Math.max(parseInteger(process.env.AUTOMATION_TIMEOUT_MS, 20000), 5000),
     workerIntervalMs: Math.max(parseInteger(process.env.AUTOMATION_WORKER_INTERVAL_MS, 60000), 10000),
@@ -75,7 +82,12 @@ function getMissingAutomationConfigKeys(config = getAutomationConfig()) {
     ["AUTOMATION_SUBMIT_SELECTOR", config.submitSelector]
   ];
 
-  if (!config.fieldMap || Object.keys(config.fieldMap).length === 0) {
+  if (
+    config.siteId === "ce-check-in" &&
+    (!config.questionnaireAnswers || Object.keys(config.questionnaireAnswers).length === 0)
+  ) {
+    required.push(["AUTOMATION_QUESTIONNAIRE_ANSWERS_JSON", ""]);
+  } else if (config.siteId !== "ce-check-in" && (!config.fieldMap || Object.keys(config.fieldMap).length === 0)) {
     required.push(["AUTOMATION_FIELD_MAP_JSON", ""]);
   }
 

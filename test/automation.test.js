@@ -31,4 +31,22 @@ describe("automation helpers", () => {
     expect(payload.location).toBe("123 Main St");
     expect(missingFields).toEqual(["time"]);
   });
+
+  it("treats questionnaire answers as required config for ce check-in", () => {
+    const { getMissingAutomationConfigKeys } = require("../src/automation/config");
+    const missing = getMissingAutomationConfigKeys({
+      siteId: "ce-check-in",
+      loginUrl: "https://www.cecheckin.com/client/account/signin",
+      formUrl: "https://www.cecheckin.com/client/en-us/report/demo",
+      usernameSelector: 'input[name="Pin"]',
+      passwordSelector: 'input[name="Password"]',
+      loginSubmitSelector: "button.btn.btn-primary.btn-lg.btn-block",
+      authCheckSelector: "#signOutForm",
+      submitSelector: "a.btn.btn-primary.btn-checkin",
+      questionnaireAnswers: {}
+    });
+
+    expect(missing).toContain("AUTOMATION_QUESTIONNAIRE_ANSWERS_JSON");
+    expect(missing).not.toContain("AUTOMATION_FIELD_MAP_JSON");
+  });
 });
