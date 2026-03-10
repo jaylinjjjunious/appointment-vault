@@ -22,7 +22,7 @@ image = (
     )
     .add_local_dir(".", remote_path=APP_DIR)
     .workdir(APP_DIR)
-    .run_commands("npm install")
+    .run_commands("npm install", "npm run playwright:install", "npm run playwright:verify")
 )
 
 

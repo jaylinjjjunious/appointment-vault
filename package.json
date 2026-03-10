@@ -30,6 +30,8 @@
     "stable:logs": "set \"PM2_HOME=.pm2\"&& npx pm2 logs appointment-vault --lines 100",
     "stable:save": "set \"PM2_HOME=.pm2\"&& npx pm2 save",
     "worker:automation": "node src/automationWorker.js",
+    "playwright:install": "node scripts/install-playwright.js",
+    "playwright:verify": "node scripts/verify-playwright-launch.js",
     "lint": "eslint . --ext .js,.cjs --max-warnings=0",
     "format": "prettier --write .",
     "test": "vitest run",

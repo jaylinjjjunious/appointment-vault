@@ -4,7 +4,7 @@ services:
     env: node
     plan: free
     autoDeploy: true
-    buildCommand: npm install && npx playwright install chromium
+    buildCommand: npm ci && npm run playwright:install && npm run playwright:verify
     startCommand: npm start
     healthCheckPath: /health
     disk:
@@ -89,7 +89,7 @@ services:
     env: node
     plan: free
     autoDeploy: true
-    buildCommand: npm install && npx playwright install chromium
+    buildCommand: npm ci && npm run playwright:install && npm run playwright:verify
     startCommand: npm run worker:automation
     disk:
       name: data
