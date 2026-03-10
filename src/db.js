@@ -336,6 +336,38 @@ if (!automationIntegrationColumns.includes("lastRunSnapshotPath")) {
   db.exec(`ALTER TABLE automation_integrations ADD COLUMN lastRunSnapshotPath TEXT`);
 }
 
+if (!automationIntegrationColumns.includes("monthlyPhotoEnabled")) {
+  db.exec(`ALTER TABLE automation_integrations ADD COLUMN monthlyPhotoEnabled INTEGER NOT NULL DEFAULT 0`);
+}
+
+if (!automationIntegrationColumns.includes("monthlyPhotoDay")) {
+  db.exec(`ALTER TABLE automation_integrations ADD COLUMN monthlyPhotoDay INTEGER NOT NULL DEFAULT 1`);
+}
+
+if (!automationIntegrationColumns.includes("handoffReminderEmail")) {
+  db.exec(`ALTER TABLE automation_integrations ADD COLUMN handoffReminderEmail TEXT`);
+}
+
+if (!automationIntegrationColumns.includes("lastHandoffStatus")) {
+  db.exec(`ALTER TABLE automation_integrations ADD COLUMN lastHandoffStatus TEXT`);
+}
+
+if (!automationIntegrationColumns.includes("lastHandoffAt")) {
+  db.exec(`ALTER TABLE automation_integrations ADD COLUMN lastHandoffAt TEXT`);
+}
+
+if (!automationIntegrationColumns.includes("lastHandoffCompletedAt")) {
+  db.exec(`ALTER TABLE automation_integrations ADD COLUMN lastHandoffCompletedAt TEXT`);
+}
+
+if (!automationIntegrationColumns.includes("lastHandoffMessage")) {
+  db.exec(`ALTER TABLE automation_integrations ADD COLUMN lastHandoffMessage TEXT`);
+}
+
+if (!automationIntegrationColumns.includes("lastHandoffResumeUrl")) {
+  db.exec(`ALTER TABLE automation_integrations ADD COLUMN lastHandoffResumeUrl TEXT`);
+}
+
 db.exec(`
   CREATE TABLE IF NOT EXISTS automation_submission_jobs (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -372,6 +404,35 @@ db.exec(`
 db.exec(`
   CREATE INDEX IF NOT EXISTS idx_automation_jobs_user_created
   ON automation_submission_jobs (userId, siteId, createdAt DESC)
+`);
+
+db.exec(`
+  CREATE TABLE IF NOT EXISTS automation_photo_handoffs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    userId INTEGER NOT NULL,
+    siteId TEXT NOT NULL,
+    periodKey TEXT NOT NULL,
+    scheduledFor TEXT NOT NULL,
+    status TEXT NOT NULL CHECK (status IN ('pending', 'preparing', 'waiting_for_user', 'completed', 'failed', 'cancelled')),
+    checkpoint TEXT,
+    resumeUrl TEXT,
+    failureMessage TEXT,
+    notificationSent INTEGER NOT NULL DEFAULT 0,
+    createdAt TEXT NOT NULL,
+    updatedAt TEXT NOT NULL,
+    completedAt TEXT,
+    FOREIGN KEY (userId) REFERENCES users(id)
+  )
+`);
+
+db.exec(`
+  CREATE UNIQUE INDEX IF NOT EXISTS idx_automation_photo_handoffs_period
+  ON automation_photo_handoffs (userId, siteId, periodKey)
+`);
+
+db.exec(`
+  CREATE INDEX IF NOT EXISTS idx_automation_photo_handoffs_due
+  ON automation_photo_handoffs (siteId, status, scheduledFor, id)
 `);
 
 module.exports = db;

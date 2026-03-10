@@ -10,6 +10,7 @@ const {
 } = require("./config");
 const { decryptSecret, encryptSecret, hasAutomationSecretKey } = require("./crypto");
 const { createSingleSiteAdapter } = require("./siteAdapter");
+const { hasEmailConfig, sendReminderEmail } = require("../services/emailService");
 
 const selectIntegrationByUserStatement = db.prepare(
   `SELECT *
@@ -28,6 +29,9 @@ const upsertIntegrationStatement = db.prepare(`
     siteId,
     targetName,
     enabled,
+    monthlyPhotoEnabled,
+    monthlyPhotoDay,
+    handoffReminderEmail,
     encryptedUsername,
     encryptedPassword,
     scheduleLeadMinutes,
@@ -43,6 +47,9 @@ const upsertIntegrationStatement = db.prepare(`
     @siteId,
     @targetName,
     @enabled,
+    @monthlyPhotoEnabled,
+    @monthlyPhotoDay,
+    @handoffReminderEmail,
     @encryptedUsername,
     @encryptedPassword,
     @scheduleLeadMinutes,
@@ -57,6 +64,9 @@ const upsertIntegrationStatement = db.prepare(`
   ON CONFLICT(userId, siteId) DO UPDATE SET
     targetName = excluded.targetName,
     enabled = excluded.enabled,
+    monthlyPhotoEnabled = excluded.monthlyPhotoEnabled,
+    monthlyPhotoDay = excluded.monthlyPhotoDay,
+    handoffReminderEmail = excluded.handoffReminderEmail,
     encryptedUsername = excluded.encryptedUsername,
     encryptedPassword = excluded.encryptedPassword,
     scheduleLeadMinutes = excluded.scheduleLeadMinutes,
@@ -88,6 +98,13 @@ const selectJobsForUserStatement = db.prepare(
    ORDER BY createdAt DESC
    LIMIT ?`
 );
+const selectPhotoHandoffsForUserStatement = db.prepare(
+  `SELECT *
+   FROM automation_photo_handoffs
+   WHERE userId = ? AND siteId = ?
+   ORDER BY createdAt DESC
+   LIMIT ?`
+);
 const cancelPendingJobsForUserStatement = db.prepare(`
   UPDATE automation_submission_jobs
      SET status = 'cancelled',
@@ -100,6 +117,13 @@ const selectNextJobForUserStatement = db.prepare(
   `SELECT *
    FROM automation_submission_jobs
    WHERE userId = ? AND siteId = ? AND status IN ('pending', 'running')
+   ORDER BY scheduledFor ASC, id ASC
+   LIMIT 1`
+);
+const selectNextPhotoHandoffStatement = db.prepare(
+  `SELECT *
+   FROM automation_photo_handoffs
+   WHERE userId = ? AND siteId = ? AND status IN ('pending', 'preparing', 'waiting_for_user')
    ORDER BY scheduledFor ASC, id ASC
    LIMIT 1`
 );
@@ -207,6 +231,76 @@ const completeJobStatement = db.prepare(`
          updatedAt = @updatedAt
    WHERE id = @id
 `);
+const upsertPhotoHandoffStatement = db.prepare(`
+  INSERT INTO automation_photo_handoffs (
+    userId,
+    siteId,
+    periodKey,
+    scheduledFor,
+    status,
+    checkpoint,
+    resumeUrl,
+    failureMessage,
+    notificationSent,
+    createdAt,
+    updatedAt,
+    completedAt
+  ) VALUES (
+    @userId,
+    @siteId,
+    @periodKey,
+    @scheduledFor,
+    @status,
+    @checkpoint,
+    @resumeUrl,
+    @failureMessage,
+    @notificationSent,
+    @createdAt,
+    @updatedAt,
+    @completedAt
+  )
+  ON CONFLICT(userId, siteId, periodKey) DO UPDATE SET
+    scheduledFor = excluded.scheduledFor,
+    updatedAt = excluded.updatedAt
+`);
+const claimDuePhotoHandoffStatement = db.prepare(`
+  UPDATE automation_photo_handoffs
+     SET status = 'preparing',
+         updatedAt = @updatedAt
+   WHERE id = @id
+     AND status = 'pending'
+`);
+const selectDuePhotoHandoffStatement = db.prepare(
+  `SELECT *
+   FROM automation_photo_handoffs
+   WHERE siteId = ?
+     AND status = 'pending'
+     AND scheduledFor <= ?
+   ORDER BY scheduledFor ASC, id ASC
+   LIMIT 1`
+);
+const selectUserContactForHandoffStatement = db.prepare(
+  `SELECT id, email, phoneNumber, displayName
+   FROM users
+   WHERE id = ?`
+);
+const updatePhotoHandoffStatement = db.prepare(`
+  UPDATE automation_photo_handoffs
+     SET scheduledFor = COALESCE(@scheduledFor, scheduledFor),
+         status = @status,
+         checkpoint = @checkpoint,
+         resumeUrl = @resumeUrl,
+         failureMessage = @failureMessage,
+         notificationSent = @notificationSent,
+         completedAt = @completedAt,
+         updatedAt = @updatedAt
+   WHERE id = @id
+`);
+const selectPhotoHandoffByIdStatement = db.prepare(
+  `SELECT *
+   FROM automation_photo_handoffs
+   WHERE id = ?`
+);
 
 function getSiteIdentity() {
   const config = getAutomationConfig();
@@ -259,6 +353,14 @@ function listAutomationJobsForUser(userId, limit = 12) {
   return selectJobsForUserStatement.all(userId, siteId, Math.max(limit, 1));
 }
 
+function listPhotoHandoffsForUser(userId, limit = 6) {
+  if (!userId) {
+    return [];
+  }
+  const { siteId } = getSiteIdentity();
+  return selectPhotoHandoffsForUserStatement.all(userId, siteId, Math.max(limit, 1));
+}
+
 function getUserAutomationIntegrationRow(userId) {
   if (!userId) {
     return null;
@@ -273,6 +375,10 @@ function toViewIntegration(row) {
   const nextJob = integration
     ? selectNextJobForUserStatement.get(integration.userId, integration.siteId)
     : null;
+  const nextPhotoHandoff = integration
+    ? selectNextPhotoHandoffStatement.get(integration.userId, integration.siteId)
+    : null;
+  const recentPhotoHandoffs = integration ? listPhotoHandoffsForUser(integration.userId) : [];
   return {
     configured: hasAutomationTargetConfig(config) && hasAutomationSecretKey(),
     targetName: config.targetName || DEFAULT_TARGET_NAME,
@@ -282,6 +388,9 @@ function toViewIntegration(row) {
       ...(hasAutomationSecretKey() ? [] : ["AUTOMATION_SECRET_KEY"])
     ],
     enabled: integration ? Number(integration.enabled) === 1 : false,
+    monthlyPhotoEnabled: integration ? Number(integration.monthlyPhotoEnabled) === 1 : false,
+    monthlyPhotoDay: integration ? Number(integration.monthlyPhotoDay || 1) : 1,
+    handoffReminderEmail: integration?.handoffReminderEmail || "",
     scheduleLeadMinutes: integration
       ? Number(integration.scheduleLeadMinutes || config.defaultLeadMinutes)
       : config.defaultLeadMinutes,
@@ -298,8 +407,20 @@ function toViewIntegration(row) {
     lastRunLog: parseRunLog(integration?.lastRunLog),
     hasCurrentRunSnapshot: Boolean(integration?.currentRunSnapshotPath),
     hasLastRunSnapshot: Boolean(integration?.lastRunSnapshotPath),
+    lastHandoffStatus: integration?.lastHandoffStatus || "",
+    lastHandoffAt: integration?.lastHandoffAt || "",
+    lastHandoffCompletedAt: integration?.lastHandoffCompletedAt || "",
+    lastHandoffMessage: integration?.lastHandoffMessage || "",
+    lastHandoffResumeUrl: integration?.lastHandoffResumeUrl || "",
     nextRunAt: nextJob?.scheduledFor || "",
-    jobs: integration ? listAutomationJobsForUser(integration.userId) : []
+    nextPhotoHandoffAt: nextPhotoHandoff?.scheduledFor || "",
+    jobs: integration ? listAutomationJobsForUser(integration.userId) : [],
+    photoHandoffs: recentPhotoHandoffs,
+    currentPhotoHandoff:
+      recentPhotoHandoffs.find((handoff) =>
+        ["pending", "preparing", "waiting_for_user"].includes(String(handoff.status || ""))
+      ) || null,
+    canEmailPhotoReminder: hasEmailConfig()
   };
 }
 
@@ -325,6 +446,16 @@ function saveUserAutomationIntegration(userId, input = {}) {
   const nextPassword = String(input.password || "").trim();
   const enabled = parseBoolean(input.enabled, false);
   const clearSavedCredentials = parseBoolean(input.clearSavedCredentials, false);
+  const monthlyPhotoEnabled = parseBoolean(input.monthlyPhotoEnabled, existing ? Number(existing.monthlyPhotoEnabled) === 1 : false);
+  const monthlyPhotoDay = Math.min(
+    Math.max(parseInteger(input.monthlyPhotoDay, Number(existing?.monthlyPhotoDay || 1)), 1),
+    28
+  );
+  const handoffReminderEmail = String(
+    input.handoffReminderEmail !== undefined
+      ? input.handoffReminderEmail
+      : existing?.handoffReminderEmail || ""
+  ).trim();
   const scheduleLeadMinutes = Math.max(
     parseInteger(input.scheduleLeadMinutes, config.defaultLeadMinutes),
     0
@@ -352,6 +483,9 @@ function saveUserAutomationIntegration(userId, input = {}) {
     siteId,
     targetName,
     enabled: enabled ? 1 : 0,
+    monthlyPhotoEnabled: monthlyPhotoEnabled ? 1 : 0,
+    monthlyPhotoDay,
+    handoffReminderEmail: handoffReminderEmail || null,
     encryptedUsername,
     encryptedPassword,
     scheduleLeadMinutes,
@@ -366,6 +500,9 @@ function saveUserAutomationIntegration(userId, input = {}) {
 
   if (enabled) {
     syncAutomationJobsForUser(userId);
+    if (monthlyPhotoEnabled) {
+      syncMonthlyPhotoHandoffForUser(userId);
+    }
   } else {
     cancelPendingJobsForUserStatement.run(nowIso, userId, siteId);
   }
@@ -430,6 +567,81 @@ function syncAutomationJobsForUser(userId) {
   }
 
   return touched;
+}
+
+function buildMonthlyPeriodKey(date) {
+  const year = date.getUTCFullYear();
+  const month = String(date.getUTCMonth() + 1).padStart(2, "0");
+  return `${year}-${month}`;
+}
+
+function buildMonthlyScheduledFor(dayOfMonth, baseDate = new Date()) {
+  const scheduled = new Date(
+    Date.UTC(
+      baseDate.getUTCFullYear(),
+      baseDate.getUTCMonth(),
+      Math.min(Math.max(Number(dayOfMonth || 1), 1), 28),
+      16,
+      0,
+      0,
+      0
+    )
+  );
+  return scheduled.toISOString();
+}
+
+function updateIntegrationHandoffState(userId, patch = {}) {
+  const integration = getUserAutomationIntegrationRow(userId);
+  if (!integration) {
+    return;
+  }
+  const nowIso = new Date().toISOString();
+  db.prepare(`
+    UPDATE automation_integrations
+       SET lastHandoffStatus = ?,
+           lastHandoffAt = ?,
+           lastHandoffCompletedAt = ?,
+           lastHandoffMessage = ?,
+           lastHandoffResumeUrl = ?,
+           updatedAt = ?
+     WHERE userId = ? AND siteId = ?
+  `).run(
+    patch.status || integration.lastHandoffStatus || null,
+    patch.at === undefined ? integration.lastHandoffAt || null : patch.at,
+    patch.completedAt === undefined
+      ? integration.lastHandoffCompletedAt || null
+      : patch.completedAt,
+    patch.message === undefined ? integration.lastHandoffMessage || null : patch.message,
+    patch.resumeUrl === undefined ? integration.lastHandoffResumeUrl || null : patch.resumeUrl,
+    nowIso,
+    userId,
+    integration.siteId
+  );
+}
+
+function syncMonthlyPhotoHandoffForUser(userId, now = new Date()) {
+  const integration = getUserAutomationIntegrationRow(userId);
+  if (!integration || Number(integration.enabled) !== 1 || Number(integration.monthlyPhotoEnabled) !== 1) {
+    return null;
+  }
+  const periodKey = buildMonthlyPeriodKey(now);
+  const scheduledFor = buildMonthlyScheduledFor(integration.monthlyPhotoDay || 1, now);
+  const nowIso = new Date().toISOString();
+  upsertPhotoHandoffStatement.run({
+    userId,
+    siteId: integration.siteId,
+    periodKey,
+    scheduledFor,
+    status: "pending",
+    checkpoint: null,
+    resumeUrl: null,
+    failureMessage: null,
+    notificationSent: 0,
+    createdAt: nowIso,
+    updatedAt: nowIso,
+    completedAt: null
+  });
+  return selectNextPhotoHandoffStatement.get(userId, integration.siteId) || null;
 }
 
 function getAppointmentAutomationStatusMap(userId, appointmentIds = []) {
@@ -526,6 +738,23 @@ const claimDueJob = db.transaction((claimedBy) => {
     return null;
   }
   return selectJobByIdStatement.get(nextJob.id) || null;
+});
+
+const claimDuePhotoHandoff = db.transaction(() => {
+  const { siteId } = getSiteIdentity();
+  const nowIso = new Date().toISOString();
+  const nextHandoff = selectDuePhotoHandoffStatement.get(siteId, nowIso);
+  if (!nextHandoff) {
+    return null;
+  }
+  const result = claimDuePhotoHandoffStatement.run({
+    id: nextHandoff.id,
+    updatedAt: nowIso
+  });
+  if (result.changes !== 1) {
+    return null;
+  }
+  return selectPhotoHandoffByIdStatement.get(nextHandoff.id) || null;
 });
 
 function updateIntegrationRunStatus(userId, status, failureMessage = "", successAt = null) {
@@ -721,6 +950,110 @@ function startAutomationSubmissionDryRun(userId) {
   });
 }
 
+async function sendPhotoHandoffReminder(user, handoff, integration) {
+  const to =
+    String(integration?.handoffReminderEmail || "").trim() ||
+    String(user?.email || "").trim();
+  if (!to || !hasEmailConfig()) {
+    return false;
+  }
+  await sendReminderEmail({
+    to,
+    subject: `${integration.targetName} photo check-in needed`,
+    text: [
+      `Your ${integration.targetName} monthly check-in is ready for the photo step.`,
+      "",
+      "Open this page in Appointment Vault to continue:",
+      `${String(process.env.PUBLIC_BASE_URL || "https://appointment-vault.onrender.com").replace(/\/+$/, "")}/settings#automation`,
+      "",
+      handoff?.resumeUrl ? `Resume website: ${handoff.resumeUrl}` : ""
+    ]
+      .filter(Boolean)
+      .join("\n")
+  });
+  return true;
+}
+
+async function runPhotoHandoffPrep(userId, handoffId, handlers = {}) {
+  const integration = getUserAutomationIntegrationRow(userId);
+  if (!integration) {
+    throw new Error("Automation integration is not configured.");
+  }
+  const handoff = selectPhotoHandoffByIdStatement.get(handoffId);
+  if (!handoff) {
+    throw new Error("Photo handoff request was not found.");
+  }
+  const adapter = createSingleSiteAdapter(getAutomationConfig());
+  const { payload, missingFields } = adapter.buildPayloadFromAppointment({});
+  if (missingFields.length > 0 && integration.siteId !== "ce-check-in") {
+    throw new Error(`Photo handoff blocked. Missing fields: ${missingFields.join(", ")}`);
+  }
+  return adapter.prepareForPhoto({
+    credentials: getIntegrationCredentials(integration),
+    payload,
+    onProgress: typeof handlers.onProgress === "function" ? handlers.onProgress : () => {},
+    onSnapshot: typeof handlers.onSnapshot === "function" ? handlers.onSnapshot : () => {}
+  });
+}
+
+function startMonthlyPhotoHandoff(userId) {
+  const integration = getUserAutomationIntegrationRow(userId);
+  if (!integration || Number(integration.enabled) !== 1) {
+    throw new Error("Enable website automation before starting the monthly handoff.");
+  }
+  if (Number(integration.monthlyPhotoEnabled) !== 1) {
+    throw new Error("Enable monthly photo handoff first.");
+  }
+  const handoff = syncMonthlyPhotoHandoffForUser(userId, new Date()) || selectNextPhotoHandoffStatement.get(userId, integration.siteId);
+  if (!handoff) {
+    throw new Error("Unable to schedule the monthly photo handoff.");
+  }
+  updatePhotoHandoffStatement.run({
+    id: handoff.id,
+    scheduledFor: new Date().toISOString(),
+    status: "pending",
+    checkpoint: null,
+    resumeUrl: null,
+    failureMessage: null,
+    notificationSent: 0,
+    completedAt: null,
+    updatedAt: new Date().toISOString()
+  });
+  updateIntegrationHandoffState(userId, {
+    status: "pending",
+    at: new Date().toISOString(),
+    completedAt: null,
+    message: "Monthly photo handoff queued.",
+    resumeUrl: null
+  });
+}
+
+function completeMonthlyPhotoHandoff(userId, handoffId) {
+  const handoff = selectPhotoHandoffByIdStatement.get(handoffId);
+  if (!handoff || Number(handoff.userId) !== Number(userId)) {
+    throw new Error("Photo handoff was not found.");
+  }
+  const nowIso = new Date().toISOString();
+  updatePhotoHandoffStatement.run({
+    id: handoff.id,
+    scheduledFor: null,
+    status: "completed",
+    checkpoint: handoff.checkpoint || "photo_capture_required",
+    resumeUrl: handoff.resumeUrl || null,
+    failureMessage: null,
+    notificationSent: Number(handoff.notificationSent || 0),
+    completedAt: nowIso,
+    updatedAt: nowIso
+  });
+  updateIntegrationHandoffState(userId, {
+    status: "completed",
+    at: handoff.scheduledFor || nowIso,
+    completedAt: nowIso,
+    message: "Photo handoff marked complete.",
+    resumeUrl: handoff.resumeUrl || null
+  });
+}
+
 async function runAutomationWorkerCycle(options = {}) {
   const config = getAutomationConfig();
   if (!hasAutomationTargetConfig(config) || !hasAutomationSecretKey()) {
@@ -730,11 +1063,121 @@ async function runAutomationWorkerCycle(options = {}) {
   const enabled = selectEnabledIntegrationsStatement.all(config.siteId);
   for (const integration of enabled) {
     syncAutomationJobsForUser(integration.userId);
+    if (Number(integration.monthlyPhotoEnabled) === 1) {
+      syncMonthlyPhotoHandoffForUser(integration.userId);
+    }
   }
 
   const adapter = createSingleSiteAdapter(config);
   const claimedBy = String(options.claimedBy || process.pid || "automation-worker");
   let processed = 0;
+
+  for (;;) {
+    const handoff = claimDuePhotoHandoff();
+    if (!handoff) {
+      break;
+    }
+    processed += 1;
+    const integration = getUserAutomationIntegrationRow(handoff.userId);
+    const nowIso = new Date().toISOString();
+    const run = createRunObservers(handoff.userId, "Queued monthly photo handoff");
+
+    if (
+      !integration ||
+      Number(integration.enabled) !== 1 ||
+      Number(integration.monthlyPhotoEnabled) !== 1
+    ) {
+      updatePhotoHandoffStatement.run({
+        id: handoff.id,
+        scheduledFor: null,
+        status: "cancelled",
+        checkpoint: handoff.checkpoint || null,
+        resumeUrl: handoff.resumeUrl || null,
+        failureMessage: "Monthly photo handoff is no longer enabled.",
+        notificationSent: Number(handoff.notificationSent || 0),
+        completedAt: nowIso,
+        updatedAt: nowIso
+      });
+      updateIntegrationHandoffState(handoff.userId, {
+        status: "cancelled",
+        at: nowIso,
+        completedAt: nowIso,
+        message: "Monthly photo handoff was cancelled.",
+        resumeUrl: handoff.resumeUrl || null
+      });
+      continue;
+    }
+
+    try {
+      updateIntegrationHandoffState(handoff.userId, {
+        status: "preparing",
+        at: nowIso,
+        completedAt: null,
+        message: "Preparing the monthly photo handoff.",
+        resumeUrl: null
+      });
+      const result = await withTimeout(
+        runPhotoHandoffPrep(handoff.userId, handoff.id, {
+          onProgress: (message) => run.onProgress(message),
+          onSnapshot: (snapshotPath) => run.onSnapshot(snapshotPath)
+        }),
+        Math.max(config.timeoutMs * 9, 180000),
+        "Monthly photo handoff"
+      );
+      const user = selectUserContactForHandoffStatement.get(handoff.userId) || null;
+      let reminderSent = false;
+      try {
+        reminderSent = await sendPhotoHandoffReminder(
+          user,
+          { ...handoff, resumeUrl: result?.resumeUrl || handoff.resumeUrl || null },
+          integration
+        );
+      } catch (error) {
+        run.onProgress(`Photo reminder email skipped: ${error?.message || "Unknown error"}`);
+      }
+      updatePhotoHandoffStatement.run({
+        id: handoff.id,
+        scheduledFor: null,
+        status: "waiting_for_user",
+        checkpoint: result?.checkpoint || "photo_capture_required",
+        resumeUrl: result?.resumeUrl || handoff.resumeUrl || null,
+        failureMessage: null,
+        notificationSent: reminderSent ? 1 : Number(handoff.notificationSent || 0),
+        completedAt: null,
+        updatedAt: new Date().toISOString()
+      });
+      run.onComplete("Monthly photo handoff is ready for you", result?.snapshotPath || null);
+      updateIntegrationHandoffState(handoff.userId, {
+        status: "waiting_for_user",
+        at: nowIso,
+        completedAt: null,
+        message: reminderSent
+          ? "Photo step is ready. We emailed you a reminder too."
+          : "Photo step is ready. Open the website and take the photo to finish.",
+        resumeUrl: result?.resumeUrl || handoff.resumeUrl || null
+      });
+    } catch (error) {
+      run.onFailure(error?.message || "Monthly photo handoff failed.", error?.artifacts?.screenshotPath || null);
+      updatePhotoHandoffStatement.run({
+        id: handoff.id,
+        scheduledFor: null,
+        status: "failed",
+        checkpoint: handoff.checkpoint || null,
+        resumeUrl: handoff.resumeUrl || null,
+        failureMessage: error?.message || "Monthly photo handoff failed.",
+        notificationSent: Number(handoff.notificationSent || 0),
+        completedAt: nowIso,
+        updatedAt: nowIso
+      });
+      updateIntegrationHandoffState(handoff.userId, {
+        status: "failed",
+        at: nowIso,
+        completedAt: nowIso,
+        message: error?.message || "Monthly photo handoff failed.",
+        resumeUrl: handoff.resumeUrl || null
+      });
+    }
+  }
 
   for (;;) {
     const job = claimDueJob(claimedBy);
@@ -852,11 +1295,14 @@ module.exports = {
   getUserAutomationView,
   hasAutomationConfigured: () => hasAutomationTargetConfig(getAutomationConfig()) && hasAutomationSecretKey(),
   listAutomationJobsForUser,
+  listPhotoHandoffsForUser,
   runAutomationLoginTest,
   runAutomationSubmissionDryRun,
   runAutomationWorkerCycle,
   saveUserAutomationIntegration,
   startAutomationLoginTest,
   startAutomationSubmissionDryRun,
+  startMonthlyPhotoHandoff,
+  completeMonthlyPhotoHandoff,
   syncAutomationJobsForUser
 };

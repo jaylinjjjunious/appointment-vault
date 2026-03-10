@@ -230,6 +230,41 @@
           <span>Clear saved credentials</span>
         </label>
       </div>
+      <div class="form-row">
+        <label class="checkbox-field" for="monthlyPhotoEnabled">
+          <input
+            id="monthlyPhotoEnabled"
+            name="monthlyPhotoEnabled"
+            type="checkbox"
+            value="true"
+            <%= safeAutomation.monthlyPhotoEnabled ? "checked" : "" %>
+          />
+          <span>Pause monthly runs when the website needs a live photo</span>
+        </label>
+        <div class="form-field">
+          <label for="monthlyPhotoDay">Monthly Check-In Day</label>
+          <input
+            id="monthlyPhotoDay"
+            class="glass-input"
+            name="monthlyPhotoDay"
+            type="number"
+            min="1"
+            max="28"
+            value="<%= safeAutomation.monthlyPhotoDay || 1 %>"
+          />
+        </div>
+      </div>
+      <div class="form-field">
+        <label for="handoffReminderEmail">Photo Reminder Email</label>
+        <input
+          id="handoffReminderEmail"
+          class="glass-input"
+          name="handoffReminderEmail"
+          type="email"
+          value="<%= safeAutomation.handoffReminderEmail || '' %>"
+          placeholder="Leave blank to use your account email"
+        />
+      </div>
       <div class="actions">
         <button class="button glass-button" type="submit">Save Stored Login</button>
       </div>
@@ -259,6 +294,70 @@
         </div>
       </article>
     </div>
+
+    <div class="list" style="margin-top: 1rem;">
+      <article class="card glass-card appointment-card">
+        <div class="appointment-main">
+          <p><strong>Monthly Photo Handoff:</strong> <%= safeAutomation.monthlyPhotoEnabled ? "Enabled" : "Off" %></p>
+          <p><strong>Monthly Day:</strong> <%= safeAutomation.monthlyPhotoDay || 1 %></p>
+          <p><strong>Next Photo Step:</strong> <%= safeAutomation.nextPhotoHandoffAt || "Not scheduled" %></p>
+          <p><strong>Last Photo Status:</strong> <%= safeAutomation.lastHandoffStatus || "idle" %></p>
+          <p><strong>Last Photo Update:</strong> <%= safeAutomation.lastHandoffAt || "Never" %></p>
+          <% if (safeAutomation.lastHandoffCompletedAt) { %>
+            <p><strong>Last Photo Completion:</strong> <%= safeAutomation.lastHandoffCompletedAt %></p>
+          <% } %>
+          <% if (safeAutomation.lastHandoffMessage) { %>
+            <p class="<%= safeAutomation.lastHandoffStatus === 'failed' ? 'error-text' : '' %>">
+              <strong>Photo Step:</strong> <%= safeAutomation.lastHandoffMessage %>
+            </p>
+          <% } %>
+        </div>
+        <div class="actions">
+          <form action="/settings/automation/photo-start" method="POST">
+            <button class="button glass-button button-secondary" type="submit">Start Monthly Photo Step</button>
+          </form>
+          <% if (safeAutomation.lastHandoffResumeUrl) { %>
+            <a
+              class="button glass-button button-secondary"
+              href="<%= safeAutomation.lastHandoffResumeUrl %>"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              Open Photo Step
+            </a>
+          <% } %>
+          <% if (safeAutomation.currentPhotoHandoff && safeAutomation.currentPhotoHandoff.id && safeAutomation.currentPhotoHandoff.status === "waiting_for_user") { %>
+            <form action="/settings/automation/photo-complete" method="POST">
+              <input type="hidden" name="handoffId" value="<%= safeAutomation.currentPhotoHandoff.id %>" />
+              <button class="button glass-button button-secondary" type="submit">Mark Photo Complete</button>
+            </form>
+          <% } %>
+        </div>
+      </article>
+    </div>
+
+    <h3 style="margin-top: 1rem;">Recent Photo Handoffs</h3>
+    <% if (!safeAutomation.photoHandoffs || safeAutomation.photoHandoffs.length === 0) { %>
+      <p class="section-empty">No monthly photo handoffs yet.</p>
+    <% } else { %>
+      <div class="list">
+        <% safeAutomation.photoHandoffs.forEach((handoff) => { %>
+          <article class="card glass-card appointment-card">
+            <div class="appointment-main">
+              <p><strong>Month:</strong> <%= handoff.periodKey %></p>
+              <p><strong>Status:</strong> <%= handoff.status %></p>
+              <p><strong>Scheduled:</strong> <%= handoff.scheduledFor %></p>
+              <% if (handoff.checkpoint) { %>
+                <p><strong>Checkpoint:</strong> <%= handoff.checkpoint %></p>
+              <% } %>
+              <% if (handoff.failureMessage) { %>
+                <p class="error-text"><strong>Error:</strong> <%= handoff.failureMessage %></p>
+              <% } %>
+            </div>
+          </article>
+        <% }) %>
+      </div>
+    <% } %>
 
     <div class="list" style="margin-top: 1rem;">
       <article class="card glass-card appointment-card">

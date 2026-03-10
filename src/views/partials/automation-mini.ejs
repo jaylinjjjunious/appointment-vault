@@ -4,12 +4,23 @@
   <p><strong>Last Status:</strong> <%= automation.lastRunStatus || "idle" %></p>
   <p><strong>Last Success:</strong> <%= automation.lastSuccessAt || "Never" %></p>
   <p><strong>Next Run:</strong> <%= automation.nextRunAt || "Not scheduled" %></p>
+  <p><strong>Monthly Photo Step:</strong> <%= automation.monthlyPhotoEnabled ? "Enabled" : "Off" %></p>
+  <p><strong>Next Photo Step:</strong> <%= automation.nextPhotoHandoffAt || "Not scheduled" %></p>
+  <p><strong>Photo Status:</strong> <%= automation.lastHandoffStatus || "idle" %></p>
   <% if (automation.lastFailureMessage) { %>
     <p class="error-text"><strong>Last Failure:</strong> <%= automation.lastFailureMessage %></p>
+  <% } %>
+  <% if (automation.lastHandoffMessage) { %>
+    <p class="<%= automation.lastHandoffStatus === 'failed' ? 'error-text' : '' %>">
+      <strong>Photo Step:</strong> <%= automation.lastHandoffMessage %>
+    </p>
   <% } %>
   <p class="section-empty">
     Your CE Check-In login is stored on the backend and reused automatically whenever automation needs to sign in.
   </p>
+  <% if (automation.lastHandoffResumeUrl) { %>
+    <p><a href="<%= automation.lastHandoffResumeUrl %>" target="_blank" rel="noopener noreferrer">Open Photo Step</a></p>
+  <% } %>
   <% const snapshotMode = automation.hasCurrentRunSnapshot ? "current" : (automation.hasLastRunSnapshot ? "last" : ""); %>
   <div class="automation-visual" data-automation-live-visual <%= snapshotMode ? "" : "hidden" %>>
     <p><strong>Agent Visual:</strong></p>

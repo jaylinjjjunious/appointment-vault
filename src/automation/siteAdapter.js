@@ -283,6 +283,29 @@ function createSingleSiteAdapter(config = getAutomationConfig()) {
         );
       }
     },
+    async prepareForPhoto({
+      credentials,
+      payload,
+      onProgress = () => {},
+      onSnapshot = () => {}
+    }) {
+      if (config.siteId !== "ce-check-in") {
+        throw new Error("Photo handoff is only supported for CE Check-In.");
+      }
+      const result = await this.run({
+        credentials,
+        payload,
+        dryRun: true,
+        onProgress,
+        onSnapshot
+      });
+      return {
+        ok: true,
+        checkpoint: "photo_capture_required",
+        resumeUrl: config.formUrl,
+        snapshotPath: result?.snapshotPath || null
+      };
+    },
     async run({
       credentials,
       payload,

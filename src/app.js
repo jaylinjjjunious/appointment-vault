@@ -128,7 +128,9 @@ const {
   getAppointmentAutomationStatusMap,
   getAutomationSnapshotPath,
   getUserAutomationView,
+  completeMonthlyPhotoHandoff,
   saveUserAutomationIntegration,
+  startMonthlyPhotoHandoff,
   startAutomationLoginTest,
   startAutomationSubmissionDryRun,
   syncAutomationJobsForUser
@@ -2161,20 +2163,24 @@ function renderSettingsPage(req, res, next) {
           ? `Test call failed: ${String(req.query.error || "Unknown error")}`
           : "";
     const automationStatus = String(req.query.automation || "");
-      const automationStatusMessage =
-        automationStatus === "saved"
-          ? "Automation settings saved."
-          : automationStatus === "login_ok"
-            ? "Automation login test passed."
-            : automationStatus === "login_started"
-              ? "Automation login test started. Refresh this page in a moment to see the result."
+    const automationStatusMessage =
+      automationStatus === "saved"
+        ? "Automation settings saved."
+        : automationStatus === "login_ok"
+          ? "Automation login test passed."
+          : automationStatus === "login_started"
+            ? "Automation login test started. Refresh this page in a moment to see the result."
             : automationStatus === "dry_run_ok"
               ? "Automation dry run passed."
               : automationStatus === "dry_run_started"
                 ? "Automation dry run started. Refresh this page in a moment to see the result."
-              : automationStatus === "error"
-                ? `Automation error: ${String(req.query.error || "Unknown error")}`
-                : "";
+                : automationStatus === "photo_handoff_started"
+                  ? "Monthly photo handoff started. The agent is preparing the website for your photo step."
+                  : automationStatus === "photo_handoff_completed"
+                    ? "Monthly photo handoff marked complete."
+                    : automationStatus === "error"
+                      ? `Automation error: ${String(req.query.error || "Unknown error")}`
+                      : "";
 
     res.render("settings", {
       title: "Settings",
@@ -2278,6 +2284,11 @@ app.get("/automation/live", (req, res) => {
     lastRunAt: automation.lastRunAt || "",
     lastSuccessAt: automation.lastSuccessAt || "",
     lastFailureMessage: automation.lastFailureMessage || "",
+    lastHandoffStatus: automation.lastHandoffStatus || "",
+    lastHandoffAt: automation.lastHandoffAt || "",
+    lastHandoffCompletedAt: automation.lastHandoffCompletedAt || "",
+    lastHandoffMessage: automation.lastHandoffMessage || "",
+    lastHandoffResumeUrl: automation.lastHandoffResumeUrl || "",
     hasCurrentRunSnapshot: Boolean(automation.hasCurrentRunSnapshot),
     hasLastRunSnapshot: Boolean(automation.hasLastRunSnapshot),
     currentRunLog: Array.isArray(automation.currentRunLog) ? automation.currentRunLog : [],
@@ -2516,6 +2527,42 @@ app.post("/settings/automation/test-submit", async (req, res) => {
     res.redirect(
       `/settings?automation=error&error=${encodeURIComponent(
         error?.message || "Automation dry run failed."
+      )}#automation`
+    );
+  }
+});
+
+app.post("/settings/automation/photo-start", (req, res) => {
+  const user = requireCurrentUser(req, res);
+  if (!user) {
+    return;
+  }
+
+  try {
+    startMonthlyPhotoHandoff(user.id);
+    res.redirect("/settings?automation=photo_handoff_started#automation");
+  } catch (error) {
+    res.redirect(
+      `/settings?automation=error&error=${encodeURIComponent(
+        error?.message || "Unable to start the monthly photo handoff."
+      )}#automation`
+    );
+  }
+});
+
+app.post("/settings/automation/photo-complete", (req, res) => {
+  const user = requireCurrentUser(req, res);
+  if (!user) {
+    return;
+  }
+
+  try {
+    completeMonthlyPhotoHandoff(user.id, req.body?.handoffId);
+    res.redirect("/settings?automation=photo_handoff_completed#automation");
+  } catch (error) {
+    res.redirect(
+      `/settings?automation=error&error=${encodeURIComponent(
+        error?.message || "Unable to complete the monthly photo handoff."
       )}#automation`
     );
   }
