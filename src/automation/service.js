@@ -878,6 +878,10 @@ function withTimeout(promise, timeoutMs, label) {
   });
 }
 
+function getMonthlyPhotoHandoffTimeoutMs(config) {
+  return Math.max(config.timeoutMs * 18, 420000);
+}
+
 function createRunObservers(userId, initialMessage) {
   let currentRunLog = startIntegrationRunLog(userId, initialMessage);
   let latestSnapshotPath = "";
@@ -1115,7 +1119,7 @@ async function processPhotoHandoff(handoff, config) {
         onProgress: (message) => run.onProgress(message),
         onSnapshot: (snapshotPath) => run.onSnapshot(snapshotPath)
       }),
-      Math.max(config.timeoutMs * 9, 180000),
+      getMonthlyPhotoHandoffTimeoutMs(config),
       "Monthly photo handoff"
     );
     const user = selectUserContactForHandoffStatement.get(handoff.userId) || null;
