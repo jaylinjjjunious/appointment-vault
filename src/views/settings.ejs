@@ -263,6 +263,17 @@
     <div class="list" style="margin-top: 1rem;">
       <article class="card glass-card appointment-card">
         <div class="appointment-main">
+          <% const snapshotMode = safeAutomation.hasCurrentRunSnapshot ? "current" : (safeAutomation.hasLastRunSnapshot ? "last" : ""); %>
+          <% if (snapshotMode) { %>
+            <div class="automation-visual">
+              <p><strong>Agent Visual:</strong></p>
+              <img
+                class="automation-visual-image"
+                src="/automation/snapshot/<%= snapshotMode %>?v=<%= encodeURIComponent(safeAutomation.lastRunAt || safeAutomation.lastSuccessAt || Date.now()) %>"
+                alt="Automation progress preview"
+              />
+            </div>
+          <% } %>
           <p><strong>Agent Activity:</strong></p>
           <% const runLog = safeAutomation.currentRunLog && safeAutomation.currentRunLog.length > 0 ? safeAutomation.currentRunLog : safeAutomation.lastRunLog || []; %>
           <% if (runLog.length === 0) { %>

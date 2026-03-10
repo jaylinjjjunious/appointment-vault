@@ -1,6 +1,7 @@
 const express = require("express");
 const session = require("express-session");
 const twilio = require("twilio");
+const fs = require("node:fs");
 let SqliteStoreFactory = null;
 try {
   // Optional dependency during local/dev recovery. Falls back to memory store when missing.
@@ -125,6 +126,7 @@ const { matchesAppointmentQuery } = require("./lib/search");
 const {
   attachAutomationStatus,
   getAppointmentAutomationStatusMap,
+  getAutomationSnapshotPath,
   getUserAutomationView,
   saveUserAutomationIntegration,
   startAutomationLoginTest,
@@ -2263,6 +2265,21 @@ app.get("/automation/panel", (req, res) => {
   res.render("partials/automation-mini", {
     automation: getUserAutomationView(user.id)
   });
+});
+app.get("/automation/snapshot/:mode", (req, res) => {
+  const user = requireCurrentUser(req, res);
+  if (!user) {
+    return;
+  }
+
+  const mode = String(req.params.mode || "").trim().toLowerCase() === "current" ? "current" : "last";
+  const snapshotPath = getAutomationSnapshotPath(user.id, mode);
+  if (!snapshotPath || !fs.existsSync(snapshotPath)) {
+    res.status(404).send("Not found");
+    return;
+  }
+
+  res.sendFile(snapshotPath);
 });
 app.get("/calendar", (req, res) => {
   const user = requireCurrentUser(req, res);

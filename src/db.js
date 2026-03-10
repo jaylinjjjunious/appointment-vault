@@ -328,6 +328,14 @@ if (!automationIntegrationColumns.includes("lastRunLog")) {
   db.exec(`ALTER TABLE automation_integrations ADD COLUMN lastRunLog TEXT`);
 }
 
+if (!automationIntegrationColumns.includes("currentRunSnapshotPath")) {
+  db.exec(`ALTER TABLE automation_integrations ADD COLUMN currentRunSnapshotPath TEXT`);
+}
+
+if (!automationIntegrationColumns.includes("lastRunSnapshotPath")) {
+  db.exec(`ALTER TABLE automation_integrations ADD COLUMN lastRunSnapshotPath TEXT`);
+}
+
 db.exec(`
   CREATE TABLE IF NOT EXISTS automation_submission_jobs (
     id INTEGER PRIMARY KEY AUTOINCREMENT,

@@ -76,6 +76,8 @@ const updateIntegrationRunLogStatement = db.prepare(`
   UPDATE automation_integrations
      SET currentRunLog = ?,
          lastRunLog = ?,
+         currentRunSnapshotPath = ?,
+         lastRunSnapshotPath = ?,
          updatedAt = ?
    WHERE userId = ? AND siteId = ?
 `);
@@ -294,6 +296,8 @@ function toViewIntegration(row) {
     lastFailureMessage: integration?.lastFailureMessage || "",
     currentRunLog: parseRunLog(integration?.currentRunLog),
     lastRunLog: parseRunLog(integration?.lastRunLog),
+    hasCurrentRunSnapshot: Boolean(integration?.currentRunSnapshotPath),
+    hasLastRunSnapshot: Boolean(integration?.lastRunSnapshotPath),
     nextRunAt: nextJob?.scheduledFor || "",
     jobs: integration ? listAutomationJobsForUser(integration.userId) : []
   };
@@ -465,7 +469,7 @@ function attachAutomationStatus(appointments = [], statusMap = {}) {
   }));
 }
 
-async function runAutomationLoginTest(userId, onProgress = () => {}) {
+async function runAutomationLoginTest(userId, handlers = {}) {
   const integration = getUserAutomationIntegrationRow(userId);
   if (!integration) {
     throw new Error("Save automation settings first.");
@@ -475,11 +479,12 @@ async function runAutomationLoginTest(userId, onProgress = () => {}) {
     credentials: getIntegrationCredentials(integration),
     payload: {},
     dryRun: true,
-    onProgress
+    onProgress: typeof handlers.onProgress === "function" ? handlers.onProgress : () => {},
+    onSnapshot: typeof handlers.onSnapshot === "function" ? handlers.onSnapshot : () => {}
   });
 }
 
-async function runAutomationSubmissionDryRun(userId, onProgress = () => {}) {
+async function runAutomationSubmissionDryRun(userId, handlers = {}) {
   const integration = getUserAutomationIntegrationRow(userId);
   if (!integration) {
     throw new Error("Save automation settings first.");
@@ -500,7 +505,8 @@ async function runAutomationSubmissionDryRun(userId, onProgress = () => {}) {
     credentials: getIntegrationCredentials(integration),
     payload,
     dryRun: true,
-    onProgress
+    onProgress: typeof handlers.onProgress === "function" ? handlers.onProgress : () => {},
+    onSnapshot: typeof handlers.onSnapshot === "function" ? handlers.onSnapshot : () => {}
   });
 }
 
@@ -542,15 +548,33 @@ function updateIntegrationRunStatus(userId, status, failureMessage = "", success
   );
 }
 
-function updateIntegrationRunLog(userId, currentRunLog, lastRunLog) {
+function updateIntegrationRunLog(
+  userId,
+  currentRunLog,
+  lastRunLog,
+  currentRunSnapshotPath = undefined,
+  lastRunSnapshotPath = undefined
+) {
   const integration = getUserAutomationIntegrationRow(userId);
   if (!integration) {
     return;
   }
   const nowIso = new Date().toISOString();
   updateIntegrationRunLogStatement.run(
-    currentRunLog === null ? null : JSON.stringify(currentRunLog || []),
-    lastRunLog === null ? null : JSON.stringify(lastRunLog || []),
+    currentRunLog === undefined
+      ? integration.currentRunLog || null
+      : currentRunLog === null
+        ? null
+        : JSON.stringify(currentRunLog || []),
+    lastRunLog === undefined
+      ? integration.lastRunLog || null
+      : lastRunLog === null
+        ? null
+        : JSON.stringify(lastRunLog || []),
+    currentRunSnapshotPath === undefined
+      ? integration.currentRunSnapshotPath || null
+      : currentRunSnapshotPath,
+    lastRunSnapshotPath === undefined ? integration.lastRunSnapshotPath || null : lastRunSnapshotPath,
     nowIso,
     userId,
     integration.siteId
@@ -559,7 +583,7 @@ function updateIntegrationRunLog(userId, currentRunLog, lastRunLog) {
 
 function startIntegrationRunLog(userId, initialMessage) {
   const entries = [buildRunLogEntry(initialMessage)];
-  updateIntegrationRunLog(userId, entries, null);
+  updateIntegrationRunLog(userId, entries, null, null, null);
   return entries;
 }
 
@@ -569,11 +593,15 @@ function appendIntegrationRunLog(userId, currentEntries, message) {
   return nextEntries;
 }
 
-function finalizeIntegrationRunLog(userId, currentEntries, finalMessage = "") {
+function updateIntegrationRunSnapshot(userId, snapshotPath) {
+  updateIntegrationRunLog(userId, undefined, undefined, snapshotPath || null, undefined);
+}
+
+function finalizeIntegrationRunLog(userId, currentEntries, finalMessage = "", snapshotPath = undefined) {
   const nextEntries = finalMessage
     ? [...(currentEntries || []), buildRunLogEntry(finalMessage)]
     : [...(currentEntries || [])];
-  updateIntegrationRunLog(userId, null, nextEntries);
+  updateIntegrationRunLog(userId, null, nextEntries, null, snapshotPath);
   return nextEntries;
 }
 
@@ -605,6 +633,28 @@ function withTimeout(promise, timeoutMs, label) {
   });
 }
 
+function createRunObservers(userId, initialMessage) {
+  let currentRunLog = startIntegrationRunLog(userId, initialMessage);
+  let latestSnapshotPath = "";
+  return {
+    onProgress(message) {
+      currentRunLog = appendIntegrationRunLog(userId, currentRunLog, message);
+    },
+    onSnapshot(snapshotPath) {
+      if (snapshotPath) {
+        latestSnapshotPath = snapshotPath;
+        updateIntegrationRunSnapshot(userId, snapshotPath);
+      }
+    },
+    onComplete(message, snapshotPath = undefined) {
+      finalizeIntegrationRunLog(userId, currentRunLog, message, snapshotPath || latestSnapshotPath || null);
+    },
+    onFailure(message, snapshotPath = undefined) {
+      finalizeIntegrationRunLog(userId, currentRunLog, message, snapshotPath || latestSnapshotPath || null);
+    }
+  };
+}
+
 function startAutomationLoginTest(userId) {
   const integration = getUserAutomationIntegrationRow(userId);
   if (!integration) {
@@ -612,26 +662,23 @@ function startAutomationLoginTest(userId) {
   }
 
   const config = getAutomationConfig();
-  const timeoutMs = Math.max(config.timeoutMs * 2, 45000);
-  let currentRunLog = startIntegrationRunLog(userId, "Queued login test");
+  const timeoutMs = Math.max(config.timeoutMs * 6, 120000);
+  const run = createRunObservers(userId, "Queued login test");
   updateIntegrationRunStatus(userId, "running", "Automation login test in progress.");
   runDetached(async () => {
     try {
-      await withTimeout(
-        runAutomationLoginTest(userId, (message) => {
-          currentRunLog = appendIntegrationRunLog(userId, currentRunLog, message);
+      const result = await withTimeout(
+        runAutomationLoginTest(userId, {
+          onProgress: (message) => run.onProgress(message),
+          onSnapshot: (snapshotPath) => run.onSnapshot(snapshotPath)
         }),
         timeoutMs,
         "Automation login test"
       );
-      finalizeIntegrationRunLog(userId, currentRunLog, "Login test completed");
+      run.onComplete("Login test completed", result?.snapshotPath || null);
       updateIntegrationRunStatus(userId, "succeeded", "", new Date().toISOString());
     } catch (error) {
-      finalizeIntegrationRunLog(
-        userId,
-        currentRunLog,
-        error?.message || "Automation login failed."
-      );
+      run.onFailure(error?.message || "Automation login failed.", error?.artifacts?.screenshotPath || null);
       updateIntegrationRunStatus(
         userId,
         "failed",
@@ -648,26 +695,23 @@ function startAutomationSubmissionDryRun(userId) {
   }
 
   const config = getAutomationConfig();
-  const timeoutMs = Math.max(config.timeoutMs * 4, 90000);
-  let currentRunLog = startIntegrationRunLog(userId, "Queued dry run");
+  const timeoutMs = Math.max(config.timeoutMs * 9, 180000);
+  const run = createRunObservers(userId, "Queued dry run");
   updateIntegrationRunStatus(userId, "running", "Automation dry run in progress.");
   runDetached(async () => {
     try {
-      await withTimeout(
-        runAutomationSubmissionDryRun(userId, (message) => {
-          currentRunLog = appendIntegrationRunLog(userId, currentRunLog, message);
+      const result = await withTimeout(
+        runAutomationSubmissionDryRun(userId, {
+          onProgress: (message) => run.onProgress(message),
+          onSnapshot: (snapshotPath) => run.onSnapshot(snapshotPath)
         }),
         timeoutMs,
         "Automation dry run"
       );
-      finalizeIntegrationRunLog(userId, currentRunLog, "Dry run completed");
+      run.onComplete("Dry run completed", result?.snapshotPath || null);
       updateIntegrationRunStatus(userId, "succeeded", "", new Date().toISOString());
     } catch (error) {
-      finalizeIntegrationRunLog(
-        userId,
-        currentRunLog,
-        error?.message || "Automation dry run failed."
-      );
+      run.onFailure(error?.message || "Automation dry run failed.", error?.artifacts?.screenshotPath || null);
       updateIntegrationRunStatus(
         userId,
         "failed",
@@ -732,16 +776,19 @@ async function runAutomationWorkerCycle(options = {}) {
       if (missingFields.length > 0) {
         throw new Error(`Missing fields: ${missingFields.join(", ")}`);
       }
-      let currentRunLog = startIntegrationRunLog(job.userId, `Queued job for appointment ${job.appointmentId}`);
+      const run = createRunObservers(job.userId, `Queued job for appointment ${job.appointmentId}`);
       const result = await adapter.run({
         credentials,
         payload,
         dryRun: false,
         onProgress: (message) => {
-          currentRunLog = appendIntegrationRunLog(job.userId, currentRunLog, message);
+          run.onProgress(message);
+        },
+        onSnapshot: (snapshotPath) => {
+          run.onSnapshot(snapshotPath);
         }
       });
-      finalizeIntegrationRunLog(job.userId, currentRunLog, "Scheduled automation completed");
+      run.onComplete("Scheduled automation completed", result?.snapshotPath || null);
       completeJobStatement.run({
         id: job.id,
         status: "succeeded",
@@ -762,7 +809,8 @@ async function runAutomationWorkerCycle(options = {}) {
       finalizeIntegrationRunLog(
         job.userId,
         parseRunLog(integrationRun?.currentRunLog),
-        error?.message || "Automation submission failed."
+        error?.message || "Automation submission failed.",
+        error?.artifacts?.screenshotPath || null
       );
       const snapshotPath = error?.artifacts?.screenshotPath || error?.artifacts?.htmlPath || null;
       completeJobStatement.run({
@@ -792,6 +840,15 @@ module.exports = {
   attachAutomationStatus,
   getAppointmentAutomationStatusMap,
   getAutomationConfig,
+  getAutomationSnapshotPath(userId, mode = "last") {
+    const integration = getUserAutomationIntegrationRow(userId);
+    if (!integration) {
+      return "";
+    }
+    return mode === "current"
+      ? String(integration.currentRunSnapshotPath || "")
+      : String(integration.lastRunSnapshotPath || "");
+  },
   getUserAutomationView,
   hasAutomationConfigured: () => hasAutomationTargetConfig(getAutomationConfig()) && hasAutomationSecretKey(),
   listAutomationJobsForUser,

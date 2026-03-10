@@ -3226,6 +3226,20 @@ summary:focus-visible {
   font-size: 0.88rem;
 }
 
+.automation-visual {
+  display: grid;
+  gap: 0.55rem;
+  margin-bottom: 0.9rem;
+}
+
+.automation-visual-image {
+  width: 100%;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: #0b0e15;
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.28);
+}
+
   .hero-sheet-modal.is-open .hero-modal-card {
     transform: translateY(0);
   }

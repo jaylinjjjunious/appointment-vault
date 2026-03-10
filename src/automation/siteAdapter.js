@@ -108,6 +108,18 @@ function createFailureArtifacts(config, slug, pageContent, screenshotBuffer) {
   return { htmlPath, screenshotPath };
 }
 
+async function captureProgressSnapshot(page, config, slug) {
+  fs.mkdirSync(config.captureDir, { recursive: true });
+  const safeSlug = String(slug || "step")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 48) || "step";
+  const snapshotPath = path.join(config.captureDir, `${Date.now()}-${safeSlug}.png`);
+  await page.screenshot({ fullPage: true, path: snapshotPath });
+  return snapshotPath;
+}
+
 function buildChromiumLaunchOptions(playwright, config) {
   const executablePath = ensureChromiumExecutablePath(playwright, config.browserExecutablePath);
   const options = {
@@ -271,34 +283,76 @@ function createSingleSiteAdapter(config = getAutomationConfig()) {
         );
       }
     },
-    async run({ credentials, payload, dryRun = false, onProgress = () => {} }) {
+    async run({
+      credentials,
+      payload,
+      dryRun = false,
+      onProgress = () => {},
+      onSnapshot = () => {}
+    }) {
       if (!hasAutomationTargetConfig(config)) {
         throw new Error("Automation target is not fully configured.");
       }
+      let latestSnapshotPath = "";
+      const progress = async (message, snapshotSlug = "") => {
+        onProgress(message);
+        try {
+          latestSnapshotPath = await captureProgressSnapshot(page, config, snapshotSlug || message);
+          onSnapshot(latestSnapshotPath);
+        } catch (error) {
+          // Keep automation running even if a preview snapshot cannot be written.
+        }
+      };
+
       onProgress("Launching browser");
       const playwright = await requirePlaywright();
       const browser = await playwright.chromium.launch(
         buildChromiumLaunchOptions(playwright, config)
       );
-      onProgress("Creating browser page");
       const page = await browser.newPage();
 
       try {
-        await this.login(page, credentials, onProgress);
+        await progress("Creating browser page", "page-created");
+        await this.login(page, credentials, async (message) => {
+          await progress(message);
+        });
         if (!payload || Object.keys(payload).length === 0) {
-          onProgress("Login test completed");
-          return { ok: true, mode: "login", externalReference: null };
+          await progress("Login test completed", "login-complete");
+          return {
+            ok: true,
+            mode: "login",
+            externalReference: null,
+            snapshotPath: latestSnapshotPath || null
+          };
         }
-        await this.openForm(page, onProgress);
-        await this.fillForm(page, payload, onProgress);
+        await this.openForm(page, async (message) => {
+          await progress(message);
+        });
+        await this.fillForm(page, payload, async (message) => {
+          await progress(message);
+        });
         if (dryRun) {
-          onProgress("Dry run completed");
-          return { ok: true, mode: "dry-run", externalReference: null };
+          await progress("Dry run completed", "dry-run-complete");
+          return {
+            ok: true,
+            mode: "dry-run",
+            externalReference: null,
+            snapshotPath: latestSnapshotPath || null
+          };
         }
-        await this.submit(page, onProgress);
-        await this.assertSuccess(page, onProgress);
-        onProgress("Automation completed successfully");
-        return { ok: true, mode: "submit", externalReference: page.url() };
+        await this.submit(page, async (message) => {
+          await progress(message);
+        });
+        await this.assertSuccess(page, async (message) => {
+          await progress(message);
+        });
+        await progress("Automation completed successfully", "submit-complete");
+        return {
+          ok: true,
+          mode: "submit",
+          externalReference: page.url(),
+          snapshotPath: latestSnapshotPath || null
+        };
       } catch (error) {
         let screenshotBuffer = null;
         try {
