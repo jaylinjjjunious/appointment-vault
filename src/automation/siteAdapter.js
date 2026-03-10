@@ -1,6 +1,7 @@
 const fs = require("node:fs");
 const path = require("node:path");
 const { getAutomationConfig, hasAutomationTargetConfig } = require("./config");
+const { resolveChromiumExecutablePath } = require("./playwrightExecutable");
 
 function normalizeFieldDefinition(definition) {
   if (typeof definition === "string") {
@@ -111,9 +112,7 @@ function buildChromiumLaunchOptions(playwright, config) {
   const options = {
     headless: config.headless
   };
-  const executablePath =
-    String(config.browserExecutablePath || "").trim() ||
-    String(playwright?.chromium?.executablePath?.() || "").trim();
+  const executablePath = resolveChromiumExecutablePath(playwright, config.browserExecutablePath);
   if (executablePath) {
     options.executablePath = executablePath;
   }
