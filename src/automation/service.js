@@ -1017,12 +1017,23 @@ async function runPhotoHandoffPrep(userId, handoffId, handlers = {}) {
 }
 
 function startMonthlyPhotoHandoff(userId) {
-  const integration = getUserAutomationIntegrationRow(userId);
-  if (!integration || Number(integration.enabled) !== 1) {
-    throw new Error("Enable website automation before starting the monthly handoff.");
+  let integration = getUserAutomationIntegrationRow(userId);
+  if (!integration) {
+    throw new Error("Save your website login before starting the monthly photo step.");
   }
-  if (Number(integration.monthlyPhotoEnabled) !== 1) {
-    throw new Error("Enable monthly photo handoff first.");
+  if (!integration.encryptedUsername || !integration.encryptedPassword) {
+    throw new Error("Save your website login before starting the monthly photo step.");
+  }
+  if (Number(integration.enabled) !== 1 || Number(integration.monthlyPhotoEnabled) !== 1) {
+    saveUserAutomationIntegration(userId, {
+      enabled: true,
+      monthlyPhotoEnabled: true,
+      monthlyPhotoDay: Number(integration.monthlyPhotoDay || 1)
+    });
+    integration = getUserAutomationIntegrationRow(userId);
+  }
+  if (!integration || Number(integration.enabled) !== 1) {
+    throw new Error("Unable to enable website automation for the monthly photo step.");
   }
   const handoff = syncMonthlyPhotoHandoffForUser(userId, new Date()) || selectNextPhotoHandoffStatement.get(userId, integration.siteId);
   if (!handoff) {
