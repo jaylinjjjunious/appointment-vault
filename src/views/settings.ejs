@@ -186,12 +186,54 @@
       <% } %>
     </p>
   <% } else { %>
+    <%
+      const automationSetupSteps = [
+        {
+          label: "Save your website login",
+          done: Boolean(safeAutomation.hasStoredCredentials)
+        },
+        {
+          label: "Turn on automatic website submission",
+          done: Boolean(safeAutomation.enabled)
+        },
+        {
+          label: "Turn on the monthly photo handoff",
+          done: Boolean(safeAutomation.monthlyPhotoEnabled)
+        },
+        {
+          label: "Start the monthly photo step",
+          done: Boolean(
+            safeAutomation.currentPhotoHandoff ||
+            safeAutomation.lastHandoffStatus === "waiting_for_user" ||
+            safeAutomation.lastHandoffStatus === "completed"
+          )
+        }
+      ];
+      const nextSetupStep = automationSetupSteps.find((step) => !step.done) || null;
+    %>
     <p class="section-empty">
       Connect <strong><%= safeAutomation.targetName %></strong> and schedule automatic form submission from your saved appointments.
     </p>
     <p class="section-empty">
       Your website login is stored securely on the backend. After you save it once, automation reuses it whenever it needs to sign in.
     </p>
+    <div class="list" style="margin-top: 1rem;">
+      <article class="card glass-card appointment-card">
+        <div class="appointment-main">
+          <p><strong>Setup Checklist</strong></p>
+          <% automationSetupSteps.forEach((step) => { %>
+            <p><%= step.done ? "Done" : "Next" %>: <%= step.label %></p>
+          <% }) %>
+          <% if (nextSetupStep) { %>
+            <p class="section-empty"><strong>Do this next:</strong> <%= nextSetupStep.label %></p>
+          <% } else if (safeAutomation.lastHandoffStatus === "waiting_for_user") { %>
+            <p class="section-empty"><strong>Do this next:</strong> Open the photo step on the website and take the photo there.</p>
+          <% } else if (safeAutomation.lastHandoffStatus === "completed") { %>
+            <p class="section-empty"><strong>Status:</strong> Your latest monthly photo handoff is complete.</p>
+          <% } %>
+        </div>
+      </article>
+    </div>
     <form class="form-grid" action="/settings/automation" method="POST">
       <label class="checkbox-field" for="automationEnabled">
         <input
@@ -316,6 +358,9 @@
           <form action="/settings/automation/photo-start" method="POST">
             <button class="button glass-button button-secondary" type="submit">Start Monthly Photo Step</button>
           </form>
+          <% if (!safeAutomation.enabled || !safeAutomation.monthlyPhotoEnabled || !safeAutomation.hasStoredCredentials) { %>
+            <p class="section-empty">Start Monthly Photo Step becomes useful after your saved login, automation, and monthly photo handoff are all turned on.</p>
+          <% } %>
           <% if (safeAutomation.lastHandoffResumeUrl) { %>
             <a
               class="button glass-button button-secondary"

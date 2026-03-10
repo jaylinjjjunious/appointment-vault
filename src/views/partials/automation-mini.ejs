@@ -1,4 +1,13 @@
 <div class="profile-mini-automation" data-automation-live-root data-automation-live-endpoint="/automation/live">
+  <% const nextMiniStep = !automation.hasStoredCredentials
+    ? "Save your website login in Settings."
+    : !automation.enabled
+      ? "Turn on automatic website submission."
+      : !automation.monthlyPhotoEnabled
+        ? "Turn on the monthly photo handoff."
+        : automation.lastHandoffStatus === "waiting_for_user"
+          ? "Open the photo step on the website and take the photo there."
+          : "Start the monthly photo step."; %>
   <p><strong>Stored Login:</strong> <%= automation.hasStoredCredentials ? "Saved securely" : "Not saved yet" %></p>
   <p><strong>Enabled:</strong> <%= automation.enabled ? "Yes" : "No" %></p>
   <p><strong>Last Status:</strong> <%= automation.lastRunStatus || "idle" %></p>
@@ -18,6 +27,7 @@
   <p class="section-empty">
     Your CE Check-In login is stored on the backend and reused automatically whenever automation needs to sign in.
   </p>
+  <p class="section-empty"><strong>Next:</strong> <%= nextMiniStep %></p>
   <% if (automation.lastHandoffResumeUrl) { %>
     <p><a href="<%= automation.lastHandoffResumeUrl %>" target="_blank" rel="noopener noreferrer">Open Photo Step</a></p>
   <% } %>
