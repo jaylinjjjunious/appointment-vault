@@ -120,6 +120,7 @@ const {
   detectConflicts
 } = require("./recurrence");
 const { pickDashboardHero } = require("./lib/dashboardHero");
+const { mergeGoogleEventDetails } = require("./lib/googleEventMerge");
 const { matchesAppointmentQuery } = require("./lib/search");
 const {
   attachAutomationStatus,
@@ -1836,28 +1837,7 @@ async function buildDashboardData(userId, filters, options = {}) {
         endIso: rangeEndIso,
         maxResults: 500
       });
-      const googleById = new Map(
-        googleEvents
-          .filter((event) => String(event.googleEventId || "").trim())
-          .map((event) => [String(event.googleEventId).trim(), event])
-      );
-
-      appointments = appointments.map((appointment) => {
-        const linkedId = String(appointment.googleEventId || "").trim();
-        if (!linkedId || !googleById.has(linkedId)) {
-          return appointment;
-        }
-        const remote = googleById.get(linkedId);
-        return {
-          ...appointment,
-          title: remote.title || appointment.title,
-          date: remote.date || appointment.date,
-          time: remote.time || appointment.time,
-          location: remote.location || appointment.location,
-          notes: remote.notes || appointment.notes,
-          syncedFromGoogle: true
-        };
-      });
+      appointments = mergeGoogleEventDetails(appointments, googleEvents);
 
       const unmatchedGoogle = googleEvents.filter((event) => {
         const eventId = String(event.googleEventId || "").trim();
