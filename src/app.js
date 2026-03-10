@@ -174,7 +174,9 @@ const TEST_PROFILE_EMAIL =
   String(process.env.TEST_PROFILE_EMAIL || "").trim() || "test-profile@appointment-vault.local";
 
 if (IS_PRODUCTION) {
-  app.set("trust proxy", 1);
+  // Render and similar hosts may add more than one proxy hop. Trusting the proxy
+  // chain lets Express/session correctly detect HTTPS for secure cookies.
+  app.set("trust proxy", true);
   if (!SESSION_SECRET || SESSION_SECRET === "appointment-vault-session-secret-change-me") {
     throw new Error("SESSION_SECRET must be set to a strong value in production.");
   }
@@ -372,7 +374,7 @@ app.use(
     cookie: {
       httpOnly: true,
       sameSite: "lax",
-      secure: IS_PRODUCTION,
+      secure: IS_PRODUCTION ? "auto" : false,
       path: "/",
       maxAge: runtimeEnv.session.maxAgeMs
     }
@@ -696,6 +698,22 @@ function saveSessionAsync(req) {
       return;
     }
     req.session.save((error) => {
+      if (error) {
+        reject(error);
+        return;
+      }
+      resolve();
+    });
+  });
+}
+
+function regenerateSessionAsync(req) {
+  return new Promise((resolve, reject) => {
+    if (!req.session) {
+      resolve();
+      return;
+    }
+    req.session.regenerate((error) => {
       if (error) {
         reject(error);
         return;
@@ -1608,8 +1626,11 @@ app.get("/auth/google/callback", async (req, res, next) => {
       return;
     }
 
+    await regenerateSessionAsync(req);
     req.session.userId = user.id;
     req.session.authProvider = "google";
+    req.session.authenticatedAt = new Date().toISOString();
+    setGoogleTokensOnSession(req.session, mergedTokens);
     try {
       persistGoogleTokens(user.id, mergedTokens);
       assignLegacyAppointmentsToUser(user.id);
