@@ -299,6 +299,7 @@ body::after {
 
 .topbar-left {
   flex: 1;
+  min-width: 0;
 }
 
 .topbar-search {
@@ -333,6 +334,7 @@ body::after {
   display: flex;
   align-items: center;
   gap: var(--space-2);
+  min-width: 0;
 }
 
 .avatar-pill {
@@ -379,6 +381,8 @@ body::after {
   transform: translateY(-6px) scale(0.98);
   pointer-events: none;
   transition: opacity 0.18s ease, transform 0.22s ease;
+  max-width: min(18rem, calc(100vw - 2rem));
+  box-sizing: border-box;
 }
 
 .profile-hub.is-open .profile-control-pill {
@@ -686,6 +690,8 @@ body::after {
   display: none;
   gap: 0.8rem;
   min-width: 280px;
+  max-width: calc(100vw - 2rem);
+  box-sizing: border-box;
 }
 
 .client-error-banner.show {
@@ -2458,38 +2464,62 @@ summary:focus-visible {
   body {
     overflow-x: hidden;
   }
-    .app-shell {
-        grid-template-columns: 1fr;
-        padding: 1rem;
-      }
+  .app-shell {
+    grid-template-columns: 1fr;
+    padding: 1rem;
+  }
   
-    .app-sidebar {
-      position: fixed;
-      inset: 0 auto 0 0;
-      width: 16.5rem;
-      transform: translateX(-120%);
-      transition: transform 0.2s ease;
-      z-index: 30;
-    }
+  .app-sidebar {
+    position: fixed;
+    inset: 0 auto 0 0;
+    width: min(16.5rem, calc(100vw - 1.25rem));
+    max-width: calc(100vw - 1.25rem);
+    transform: translateX(calc(-100% - 1.5rem));
+    transition: transform 0.2s ease;
+    z-index: 30;
+    visibility: hidden;
+    pointer-events: none;
+  }
 
-    .sidebar-toggle-input:checked ~ .app-sidebar {
-      transform: translateX(0);
-    }
+  .sidebar-toggle-input:checked ~ .app-sidebar {
+    transform: translateX(0);
+    visibility: visible;
+    pointer-events: auto;
+  }
 
-    .sidebar-toggle-input:checked ~ .sidebar-overlay {
-      opacity: 1;
-      pointer-events: auto;
-    }
+  .sidebar-toggle-input:checked ~ .sidebar-overlay {
+    opacity: 1;
+    pointer-events: auto;
+  }
 
   .app-topbar {
     flex-direction: column;
     align-items: flex-start;
     gap: 0.75rem;
+    width: 100%;
+    max-width: 100%;
   }
 
   .topbar-search {
     width: 100%;
     max-width: none;
+  }
+
+  .topbar-left,
+  .topbar-right,
+  .topbar-search-input,
+  .app-main,
+  .app-content,
+  .app-content > *,
+  .glass-panel,
+  .card {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .topbar-search-input {
+    min-width: 0;
+    width: 100%;
   }
 
   .topbar-right {
@@ -2574,6 +2604,13 @@ summary:focus-visible {
   .settings-layout .actions .button,
   .settings-layout .actions .glass-button {
     width: 100%;
+  }
+
+  .profile-control-pill,
+  .client-error-banner {
+    min-width: 0;
+    width: min(100%, calc(100vw - 2rem));
+    max-width: calc(100vw - 2rem);
   }
 
   .week-col {
