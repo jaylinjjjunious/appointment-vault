@@ -315,6 +315,19 @@ db.exec(`
   ON automation_integrations (siteId, enabled, updatedAt DESC)
 `);
 
+const automationIntegrationColumns = db
+  .prepare(`PRAGMA table_info(automation_integrations)`)
+  .all()
+  .map((column) => String(column.name || ""));
+
+if (!automationIntegrationColumns.includes("currentRunLog")) {
+  db.exec(`ALTER TABLE automation_integrations ADD COLUMN currentRunLog TEXT`);
+}
+
+if (!automationIntegrationColumns.includes("lastRunLog")) {
+  db.exec(`ALTER TABLE automation_integrations ADD COLUMN lastRunLog TEXT`);
+}
+
 db.exec(`
   CREATE TABLE IF NOT EXISTS automation_submission_jobs (
     id INTEGER PRIMARY KEY AUTOINCREMENT,

@@ -72,6 +72,13 @@ const updateIntegrationRunStatusStatement = db.prepare(`
          updatedAt = ?
    WHERE userId = ? AND siteId = ?
 `);
+const updateIntegrationRunLogStatement = db.prepare(`
+  UPDATE automation_integrations
+     SET currentRunLog = ?,
+         lastRunLog = ?,
+         updatedAt = ?
+   WHERE userId = ? AND siteId = ?
+`);
 const selectJobsForUserStatement = db.prepare(
   `SELECT *
    FROM automation_submission_jobs
@@ -226,6 +233,22 @@ function buildJobAuditLog(entries) {
   );
 }
 
+function parseRunLog(rawValue) {
+  try {
+    const parsed = JSON.parse(String(rawValue || "[]"));
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (error) {
+    return [];
+  }
+}
+
+function buildRunLogEntry(message) {
+  return {
+    at: new Date().toISOString(),
+    message: String(message || "").trim()
+  };
+}
+
 function listAutomationJobsForUser(userId, limit = 12) {
   if (!userId) {
     return [];
@@ -269,6 +292,8 @@ function toViewIntegration(row) {
     lastSuccessAt: integration?.lastSuccessAt || "",
     failureCount: Number(integration?.failureCount || 0),
     lastFailureMessage: integration?.lastFailureMessage || "",
+    currentRunLog: parseRunLog(integration?.currentRunLog),
+    lastRunLog: parseRunLog(integration?.lastRunLog),
     nextRunAt: nextJob?.scheduledFor || "",
     jobs: integration ? listAutomationJobsForUser(integration.userId) : []
   };
@@ -440,7 +465,7 @@ function attachAutomationStatus(appointments = [], statusMap = {}) {
   }));
 }
 
-async function runAutomationLoginTest(userId) {
+async function runAutomationLoginTest(userId, onProgress = () => {}) {
   const integration = getUserAutomationIntegrationRow(userId);
   if (!integration) {
     throw new Error("Save automation settings first.");
@@ -449,11 +474,12 @@ async function runAutomationLoginTest(userId) {
   return adapter.run({
     credentials: getIntegrationCredentials(integration),
     payload: {},
-    dryRun: true
+    dryRun: true,
+    onProgress
   });
 }
 
-async function runAutomationSubmissionDryRun(userId) {
+async function runAutomationSubmissionDryRun(userId, onProgress = () => {}) {
   const integration = getUserAutomationIntegrationRow(userId);
   if (!integration) {
     throw new Error("Save automation settings first.");
@@ -473,7 +499,8 @@ async function runAutomationSubmissionDryRun(userId) {
   return adapter.run({
     credentials: getIntegrationCredentials(integration),
     payload,
-    dryRun: true
+    dryRun: true,
+    onProgress
   });
 }
 
@@ -515,6 +542,41 @@ function updateIntegrationRunStatus(userId, status, failureMessage = "", success
   );
 }
 
+function updateIntegrationRunLog(userId, currentRunLog, lastRunLog) {
+  const integration = getUserAutomationIntegrationRow(userId);
+  if (!integration) {
+    return;
+  }
+  const nowIso = new Date().toISOString();
+  updateIntegrationRunLogStatement.run(
+    currentRunLog === null ? null : JSON.stringify(currentRunLog || []),
+    lastRunLog === null ? null : JSON.stringify(lastRunLog || []),
+    nowIso,
+    userId,
+    integration.siteId
+  );
+}
+
+function startIntegrationRunLog(userId, initialMessage) {
+  const entries = [buildRunLogEntry(initialMessage)];
+  updateIntegrationRunLog(userId, entries, null);
+  return entries;
+}
+
+function appendIntegrationRunLog(userId, currentEntries, message) {
+  const nextEntries = [...(currentEntries || []), buildRunLogEntry(message)];
+  updateIntegrationRunLog(userId, nextEntries, null);
+  return nextEntries;
+}
+
+function finalizeIntegrationRunLog(userId, currentEntries, finalMessage = "") {
+  const nextEntries = finalMessage
+    ? [...(currentEntries || []), buildRunLogEntry(finalMessage)]
+    : [...(currentEntries || [])];
+  updateIntegrationRunLog(userId, null, nextEntries);
+  return nextEntries;
+}
+
 function runDetached(promiseFactory) {
   setTimeout(() => {
     Promise.resolve()
@@ -551,12 +613,25 @@ function startAutomationLoginTest(userId) {
 
   const config = getAutomationConfig();
   const timeoutMs = Math.max(config.timeoutMs * 2, 45000);
+  let currentRunLog = startIntegrationRunLog(userId, "Queued login test");
   updateIntegrationRunStatus(userId, "running", "Automation login test in progress.");
   runDetached(async () => {
     try {
-      await withTimeout(runAutomationLoginTest(userId), timeoutMs, "Automation login test");
+      await withTimeout(
+        runAutomationLoginTest(userId, (message) => {
+          currentRunLog = appendIntegrationRunLog(userId, currentRunLog, message);
+        }),
+        timeoutMs,
+        "Automation login test"
+      );
+      finalizeIntegrationRunLog(userId, currentRunLog, "Login test completed");
       updateIntegrationRunStatus(userId, "succeeded", "", new Date().toISOString());
     } catch (error) {
+      finalizeIntegrationRunLog(
+        userId,
+        currentRunLog,
+        error?.message || "Automation login failed."
+      );
       updateIntegrationRunStatus(
         userId,
         "failed",
@@ -574,16 +649,25 @@ function startAutomationSubmissionDryRun(userId) {
 
   const config = getAutomationConfig();
   const timeoutMs = Math.max(config.timeoutMs * 4, 90000);
+  let currentRunLog = startIntegrationRunLog(userId, "Queued dry run");
   updateIntegrationRunStatus(userId, "running", "Automation dry run in progress.");
   runDetached(async () => {
     try {
       await withTimeout(
-        runAutomationSubmissionDryRun(userId),
+        runAutomationSubmissionDryRun(userId, (message) => {
+          currentRunLog = appendIntegrationRunLog(userId, currentRunLog, message);
+        }),
         timeoutMs,
         "Automation dry run"
       );
+      finalizeIntegrationRunLog(userId, currentRunLog, "Dry run completed");
       updateIntegrationRunStatus(userId, "succeeded", "", new Date().toISOString());
     } catch (error) {
+      finalizeIntegrationRunLog(
+        userId,
+        currentRunLog,
+        error?.message || "Automation dry run failed."
+      );
       updateIntegrationRunStatus(
         userId,
         "failed",
@@ -648,7 +732,16 @@ async function runAutomationWorkerCycle(options = {}) {
       if (missingFields.length > 0) {
         throw new Error(`Missing fields: ${missingFields.join(", ")}`);
       }
-      const result = await adapter.run({ credentials, payload, dryRun: false });
+      let currentRunLog = startIntegrationRunLog(job.userId, `Queued job for appointment ${job.appointmentId}`);
+      const result = await adapter.run({
+        credentials,
+        payload,
+        dryRun: false,
+        onProgress: (message) => {
+          currentRunLog = appendIntegrationRunLog(job.userId, currentRunLog, message);
+        }
+      });
+      finalizeIntegrationRunLog(job.userId, currentRunLog, "Scheduled automation completed");
       completeJobStatement.run({
         id: job.id,
         status: "succeeded",
@@ -665,6 +758,12 @@ async function runAutomationWorkerCycle(options = {}) {
       });
       updateIntegrationRunStatus(job.userId, "succeeded", "", nowIso);
     } catch (error) {
+      const integrationRun = getUserAutomationIntegrationRow(job.userId);
+      finalizeIntegrationRunLog(
+        job.userId,
+        parseRunLog(integrationRun?.currentRunLog),
+        error?.message || "Automation submission failed."
+      );
       const snapshotPath = error?.artifacts?.screenshotPath || error?.artifacts?.htmlPath || null;
       completeJobStatement.run({
         id: job.id,

@@ -135,29 +135,36 @@ function createSingleSiteAdapter(config = getAutomationConfig()) {
       }
       return buildPayloadFromAppointment(source);
     },
-    async login(page, credentials) {
+    async login(page, credentials, onProgress = () => {}) {
+      onProgress("Opening sign-in page");
       await page.goto(config.loginUrl, { waitUntil: "domcontentloaded", timeout: config.timeoutMs });
       await ensureVisible(page, config.usernameSelector, config.timeoutMs);
+      onProgress("Entering saved website login");
       await page.fill(config.usernameSelector, String(credentials.username || ""));
       await page.fill(config.passwordSelector, String(credentials.password || ""));
+      onProgress("Submitting sign-in");
       await Promise.all([
         page.waitForLoadState("networkidle", { timeout: config.timeoutMs }).catch(() => null),
         page.click(config.loginSubmitSelector)
       ]);
+      onProgress("Confirming signed-in page");
       await ensureVisible(page, config.authCheckSelector, config.timeoutMs);
     },
-    async openForm(page) {
+    async openForm(page, onProgress = () => {}) {
+      onProgress("Opening target form");
       await page.goto(config.formUrl, { waitUntil: "domcontentloaded", timeout: config.timeoutMs });
       await page.waitForLoadState("networkidle", { timeout: config.timeoutMs }).catch(() => null);
     },
-    async fillForm(page, payload) {
+    async fillForm(page, payload, onProgress = () => {}) {
       if (config.siteId === "ce-check-in") {
+        onProgress("Waiting for CE Check-In report");
         await page.waitForSelector("#client-report", {
           state: "visible",
           timeout: config.timeoutMs
         });
 
         if (payload?.updateMailingAddress) {
+          onProgress("Updating mailing address");
           const rowLocator = page.locator(".contact-information .row").filter({
             hasText: "Mailing Address"
           });
@@ -187,6 +194,7 @@ function createSingleSiteAdapter(config = getAutomationConfig()) {
           }
         }
 
+        onProgress("Loading questionnaire");
         await page.waitForSelector(".question-text", { timeout: config.timeoutMs });
         const questionItems = page.locator("li:has(.question-text)");
         const count = await questionItems.count();
@@ -211,8 +219,10 @@ function createSingleSiteAdapter(config = getAutomationConfig()) {
             throw new Error(`No configured answer for CE Check-In question: ${text}`);
           }
           const answerLabel = answer === "yes" ? "Yes" : "No";
+          onProgress(`Answering question ${index + 1} of ${count}`);
           await item.locator("button", { hasText: answerLabel }).click();
         }
+        onProgress("Questionnaire complete");
         return;
       }
 
@@ -220,11 +230,13 @@ function createSingleSiteAdapter(config = getAutomationConfig()) {
         if (payload[key] === undefined || payload[key] === null || payload[key] === "") {
           continue;
         }
+        onProgress(`Filling ${key}`);
         await ensureVisible(page, definition.selector, config.timeoutMs);
         await applyFieldValue(page, definition, payload[key]);
       }
     },
-    async submit(page) {
+    async submit(page, onProgress = () => {}) {
+      onProgress("Submitting form");
       if (config.siteId === "ce-check-in") {
         await page.locator("a.btn.btn-primary.btn-checkin").click();
         return;
@@ -234,8 +246,9 @@ function createSingleSiteAdapter(config = getAutomationConfig()) {
         page.click(config.submitSelector)
       ]);
     },
-    async assertSuccess(page) {
+    async assertSuccess(page, onProgress = () => {}) {
       if (config.siteId === "ce-check-in") {
+        onProgress("Waiting for CE Check-In confirmation");
         await page.waitForURL(
           (url) => {
             const value = String(url || "");
@@ -246,38 +259,45 @@ function createSingleSiteAdapter(config = getAutomationConfig()) {
         return;
       }
       if (config.successSelector) {
+        onProgress("Waiting for success confirmation");
         await ensureVisible(page, config.successSelector, config.timeoutMs);
         return;
       }
       if (config.successUrlContains) {
+        onProgress("Waiting for success redirect");
         await page.waitForURL(
           (url) => String(url || "").includes(config.successUrlContains),
           { timeout: config.timeoutMs }
         );
       }
     },
-    async run({ credentials, payload, dryRun = false }) {
+    async run({ credentials, payload, dryRun = false, onProgress = () => {} }) {
       if (!hasAutomationTargetConfig(config)) {
         throw new Error("Automation target is not fully configured.");
       }
+      onProgress("Launching browser");
       const playwright = await requirePlaywright();
       const browser = await playwright.chromium.launch(
         buildChromiumLaunchOptions(playwright, config)
       );
+      onProgress("Creating browser page");
       const page = await browser.newPage();
 
       try {
-        await this.login(page, credentials);
+        await this.login(page, credentials, onProgress);
         if (!payload || Object.keys(payload).length === 0) {
+          onProgress("Login test completed");
           return { ok: true, mode: "login", externalReference: null };
         }
-        await this.openForm(page);
-        await this.fillForm(page, payload);
+        await this.openForm(page, onProgress);
+        await this.fillForm(page, payload, onProgress);
         if (dryRun) {
+          onProgress("Dry run completed");
           return { ok: true, mode: "dry-run", externalReference: null };
         }
-        await this.submit(page);
-        await this.assertSuccess(page);
+        await this.submit(page, onProgress);
+        await this.assertSuccess(page, onProgress);
+        onProgress("Automation completed successfully");
         return { ok: true, mode: "submit", externalReference: page.url() };
       } catch (error) {
         let screenshotBuffer = null;

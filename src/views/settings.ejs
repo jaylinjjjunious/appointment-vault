@@ -260,6 +260,22 @@
       </article>
     </div>
 
+    <div class="list" style="margin-top: 1rem;">
+      <article class="card glass-card appointment-card">
+        <div class="appointment-main">
+          <p><strong>Agent Activity:</strong></p>
+          <% const runLog = safeAutomation.currentRunLog && safeAutomation.currentRunLog.length > 0 ? safeAutomation.currentRunLog : safeAutomation.lastRunLog || []; %>
+          <% if (runLog.length === 0) { %>
+            <p class="section-empty">No automation activity yet.</p>
+          <% } else { %>
+            <% runLog.forEach((entry) => { %>
+              <p><strong><%= entry.at %></strong> <%= entry.message %></p>
+            <% }) %>
+          <% } %>
+        </div>
+      </article>
+    </div>
+
     <h3 style="margin-top: 1rem;">Recent Automation Jobs</h3>
     <% if (!safeAutomation.jobs || safeAutomation.jobs.length === 0) { %>
       <p class="section-empty">No automation jobs yet.</p>
@@ -285,6 +301,16 @@
     <% } %>
   <% } %>
 </section>
+<% if (safeAutomation && safeAutomation.lastRunStatus === "running") { %>
+  <script>
+    window.setTimeout(() => {
+      if (window.location.hash !== "#automation") {
+        window.location.hash = "automation";
+      }
+      window.location.reload();
+    }, 5000);
+  </script>
+<% } %>
 
 <section id="activity" class="calendar-section glass-panel" data-tab-panel="activity">
   <h2>Reminder Activity</h2>

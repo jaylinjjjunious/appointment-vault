@@ -10,4 +10,13 @@
   <p class="section-empty">
     Your CE Check-In login is stored on the backend and reused automatically whenever automation needs to sign in.
   </p>
+  <p><strong>Agent Activity:</strong></p>
+  <% const runLog = automation.currentRunLog && automation.currentRunLog.length > 0 ? automation.currentRunLog : automation.lastRunLog || []; %>
+  <% if (runLog.length === 0) { %>
+    <p class="section-empty">No automation activity yet.</p>
+  <% } else { %>
+    <% runLog.forEach((entry) => { %>
+      <p><strong><%= entry.at %></strong> <%= entry.message %></p>
+    <% }) %>
+  <% } %>
 </div>
