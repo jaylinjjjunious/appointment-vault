@@ -127,6 +127,7 @@ const {
   attachAutomationStatus,
   getAppointmentAutomationStatusMap,
   getAutomationSnapshotPath,
+  getCurrentPhotoHandoffState,
   getUserAutomationView,
   completeMonthlyPhotoHandoff,
   saveUserAutomationIntegration,
@@ -2326,6 +2327,22 @@ app.get("/automation/viewer/stream", (req, res) => {
   if (!viewerState.active || !sessionId || !addViewerStreamClient(user.id, sessionId, res)) {
     res.status(404).send("No active viewer session.");
   }
+});
+app.get("/automation/photo-handoff/state", (req, res) => {
+  const user = requireCurrentUser(req, res);
+  if (!user) {
+    return;
+  }
+
+  const handoffState = getCurrentPhotoHandoffState(user.id);
+  if (!handoffState) {
+    res.status(404).json({ ok: false, message: "No active photo handoff." });
+    return;
+  }
+  res.json({
+    ok: true,
+    handoff: handoffState
+  });
 });
 app.get("/automation/snapshot/:mode", (req, res) => {
   const user = requireCurrentUser(req, res);

@@ -246,6 +246,7 @@ const upsertPhotoHandoffStatement = db.prepare(`
     scheduledFor,
     status,
     checkpoint,
+    checkpointStateJson,
     resumeUrl,
     failureMessage,
     notificationSent,
@@ -259,6 +260,7 @@ const upsertPhotoHandoffStatement = db.prepare(`
     @scheduledFor,
     @status,
     @checkpoint,
+    @checkpointStateJson,
     @resumeUrl,
     @failureMessage,
     @notificationSent,
@@ -296,6 +298,7 @@ const updatePhotoHandoffStatement = db.prepare(`
      SET scheduledFor = COALESCE(@scheduledFor, scheduledFor),
          status = @status,
          checkpoint = @checkpoint,
+         checkpointStateJson = @checkpointStateJson,
          resumeUrl = @resumeUrl,
          failureMessage = @failureMessage,
          notificationSent = @notificationSent,
@@ -345,6 +348,39 @@ function parseRunLog(rawValue) {
   }
 }
 
+function parsePhotoCheckpointState(rawValue) {
+  try {
+    const parsed = JSON.parse(String(rawValue || ""));
+    return parsed && typeof parsed === "object" ? parsed : null;
+  } catch (error) {
+    return null;
+  }
+}
+
+function serializePhotoCheckpointState(value) {
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+  return JSON.stringify(value);
+}
+
+function toPublicPhotoCheckpointState(handoff) {
+  if (!handoff) {
+    return null;
+  }
+  return {
+    id: Number(handoff.id),
+    siteId: String(handoff.siteId || ""),
+    status: String(handoff.status || ""),
+    checkpoint: String(handoff.checkpoint || ""),
+    resumeUrl: String(handoff.resumeUrl || ""),
+    scheduledFor: String(handoff.scheduledFor || ""),
+    updatedAt: String(handoff.updatedAt || ""),
+    completedAt: String(handoff.completedAt || ""),
+    state: parsePhotoCheckpointState(handoff.checkpointStateJson)
+  };
+}
+
 function buildRunLogEntry(message) {
   return {
     at: new Date().toISOString(),
@@ -386,6 +422,10 @@ function toViewIntegration(row) {
     ? selectNextPhotoHandoffStatement.get(integration.userId, integration.siteId)
     : null;
   const recentPhotoHandoffs = integration ? listPhotoHandoffsForUser(integration.userId) : [];
+  const currentPhotoHandoff =
+    recentPhotoHandoffs.find((handoff) =>
+      ["pending", "preparing", "waiting_for_user"].includes(String(handoff.status || ""))
+    ) || null;
   const viewerState = integration ? getViewerStateForUser(integration.userId) : getViewerStateForUser(0);
   return {
     configured: hasAutomationTargetConfig(config) && hasAutomationSecretKey(),
@@ -424,10 +464,8 @@ function toViewIntegration(row) {
     nextPhotoHandoffAt: nextPhotoHandoff?.scheduledFor || "",
     jobs: integration ? listAutomationJobsForUser(integration.userId) : [],
     photoHandoffs: recentPhotoHandoffs,
-    currentPhotoHandoff:
-      recentPhotoHandoffs.find((handoff) =>
-        ["pending", "preparing", "waiting_for_user"].includes(String(handoff.status || ""))
-      ) || null,
+    currentPhotoHandoff,
+    currentPhotoCheckpointState: toPublicPhotoCheckpointState(currentPhotoHandoff),
     canEmailPhotoReminder: hasEmailConfig(),
     viewerActive: Boolean(viewerState.active),
     viewerSessionId: viewerState.sessionId || "",
@@ -441,6 +479,15 @@ function toViewIntegration(row) {
 
 function getUserAutomationView(userId) {
   return toViewIntegration(getUserAutomationIntegrationRow(userId));
+}
+
+function getCurrentPhotoHandoffState(userId) {
+  const integration = getUserAutomationIntegrationRow(userId);
+  if (!integration) {
+    return null;
+  }
+  const handoff = selectNextPhotoHandoffStatement.get(userId, integration.siteId);
+  return toPublicPhotoCheckpointState(handoff);
 }
 
 function saveUserAutomationIntegration(userId, input = {}) {
@@ -649,6 +696,7 @@ function syncMonthlyPhotoHandoffForUser(userId, now = new Date()) {
     scheduledFor,
     status: "pending",
     checkpoint: null,
+    checkpointStateJson: null,
     resumeUrl: null,
     failureMessage: null,
     notificationSent: 0,
@@ -1125,6 +1173,7 @@ function startMonthlyPhotoHandoff(userId) {
     scheduledFor: new Date().toISOString(),
     status: "pending",
     checkpoint: null,
+    checkpointStateJson: null,
     resumeUrl: null,
     failureMessage: null,
     notificationSent: 0,
@@ -1152,6 +1201,7 @@ function completeMonthlyPhotoHandoff(userId, handoffId) {
     scheduledFor: null,
     status: "completed",
     checkpoint: handoff.checkpoint || "photo_capture_required",
+    checkpointStateJson: handoff.checkpointStateJson || null,
     resumeUrl: handoff.resumeUrl || null,
     failureMessage: null,
     notificationSent: Number(handoff.notificationSent || 0),
@@ -1182,6 +1232,7 @@ async function processPhotoHandoff(handoff, config) {
       scheduledFor: null,
       status: "cancelled",
       checkpoint: handoff.checkpoint || null,
+      checkpointStateJson: handoff.checkpointStateJson || null,
       resumeUrl: handoff.resumeUrl || null,
       failureMessage: "Monthly photo handoff is no longer enabled.",
       notificationSent: Number(handoff.notificationSent || 0),
@@ -1230,6 +1281,7 @@ async function processPhotoHandoff(handoff, config) {
       scheduledFor: null,
       status: "waiting_for_user",
       checkpoint: result?.checkpoint || "photo_capture_required",
+      checkpointStateJson: serializePhotoCheckpointState(result?.checkpointState),
       resumeUrl: result?.resumeUrl || handoff.resumeUrl || null,
       failureMessage: null,
       notificationSent: reminderSent ? 1 : Number(handoff.notificationSent || 0),
@@ -1256,6 +1308,7 @@ async function processPhotoHandoff(handoff, config) {
       scheduledFor: null,
       status: "failed",
       checkpoint: handoff.checkpoint || null,
+      checkpointStateJson: handoff.checkpointStateJson || null,
       resumeUrl: handoff.resumeUrl || null,
       failureMessage: error?.message || "Monthly photo handoff failed.",
       notificationSent: Number(handoff.notificationSent || 0),
@@ -1425,6 +1478,7 @@ module.exports = {
   attachAutomationStatus,
   getAppointmentAutomationStatusMap,
   getAutomationConfig,
+  getCurrentPhotoHandoffState,
   getAutomationSnapshotPath(userId, mode = "last") {
     const integration = getUserAutomationIntegrationRow(userId);
     if (!integration) {

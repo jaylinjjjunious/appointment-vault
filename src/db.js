@@ -415,6 +415,7 @@ db.exec(`
     scheduledFor TEXT NOT NULL,
     status TEXT NOT NULL CHECK (status IN ('pending', 'preparing', 'waiting_for_user', 'completed', 'failed', 'cancelled')),
     checkpoint TEXT,
+    checkpointStateJson TEXT,
     resumeUrl TEXT,
     failureMessage TEXT,
     notificationSent INTEGER NOT NULL DEFAULT 0,
@@ -434,5 +435,14 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_automation_photo_handoffs_due
   ON automation_photo_handoffs (siteId, status, scheduledFor, id)
 `);
+
+const automationPhotoHandoffColumns = db
+  .prepare(`PRAGMA table_info(automation_photo_handoffs)`)
+  .all()
+  .map((column) => String(column.name || ""));
+
+if (!automationPhotoHandoffColumns.includes("checkpointStateJson")) {
+  db.exec(`ALTER TABLE automation_photo_handoffs ADD COLUMN checkpointStateJson TEXT`);
+}
 
 module.exports = db;

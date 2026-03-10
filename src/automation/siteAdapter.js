@@ -63,6 +63,20 @@ function buildCeCheckInPayload(config) {
   };
 }
 
+function cloneCheckpointPayload(payload = {}) {
+  return {
+    questionnaireAnswers: { ...(payload.questionnaireAnswers || {}) },
+    contact: {
+      line1: String(payload.contact?.line1 || ""),
+      line2: String(payload.contact?.line2 || ""),
+      city: String(payload.contact?.city || ""),
+      state: String(payload.contact?.state || ""),
+      zip: String(payload.contact?.zip || "")
+    },
+    updateMailingAddress: Boolean(payload.updateMailingAddress)
+  };
+}
+
 async function requirePlaywright() {
   try {
     return require("playwright");
@@ -287,7 +301,10 @@ function createSingleSiteAdapter(config = getAutomationConfig()) {
       credentials,
       payload,
       onProgress = () => {},
-      onSnapshot = () => {}
+      onSnapshot = () => {},
+      onPageReady = () => {},
+      onRunFinished = () => {},
+      onRunFailed = () => {}
     }) {
       if (config.siteId !== "ce-check-in") {
         throw new Error("Photo handoff is only supported for CE Check-In.");
@@ -297,13 +314,27 @@ function createSingleSiteAdapter(config = getAutomationConfig()) {
         payload,
         dryRun: true,
         onProgress,
-        onSnapshot
+        onSnapshot,
+        onPageReady,
+        onRunFinished,
+        onRunFailed
       });
       return {
         ok: true,
         checkpoint: "photo_capture_required",
         resumeUrl: config.formUrl,
-        snapshotPath: result?.snapshotPath || null
+        snapshotPath: result?.snapshotPath || null,
+        checkpointState: {
+          siteId: config.siteId,
+          targetName: config.targetName,
+          checkpoint: "photo_capture_required",
+          resumeUrl: config.formUrl,
+          formUrl: config.formUrl,
+          authCheckSelector: config.authCheckSelector,
+          submitSelector: config.submitSelector,
+          payload: cloneCheckpointPayload(payload),
+          capturedAt: new Date().toISOString()
+        }
       };
     },
     async run({
