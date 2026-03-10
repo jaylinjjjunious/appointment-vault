@@ -2670,6 +2670,13 @@ summary:focus-visible {
     width: 100%;
   }
 
+  body.page-dashboard .app-shell,
+  body.page-dashboard .app-main,
+  body.page-dashboard .app-content {
+    height: auto;
+    max-height: none;
+  }
+
   body.page-appointments .app-shell,
   body.page-appointment-form .app-shell,
   body.page-appointment-view .app-shell,
