@@ -157,7 +157,7 @@
                     type="button"
                     class="profile-control-button"
                     data-profile-open="automation"
-                    data-profile-src="/settings#automation"
+                    data-profile-src="/automation/panel"
                     data-profile-title="Automation"
                     data-profile-meta="Open your website automation controls"
                   >
@@ -201,9 +201,9 @@
                   </a>
                 </div>
                 <div class="profile-mini-content-card">
-                  <p class="profile-mini-content" data-profile-mini-content>
+                  <div class="profile-mini-content" data-profile-mini-content>
                     Open your panel with the actions above.
-                  </p>
+                  </div>
                 </div>
               </div>
             </div>
@@ -262,8 +262,7 @@
                   }
                 } else if (panel === "automation") {
                   if (contentEl) {
-                    contentEl.textContent =
-                      "Your CE Check-In login is stored securely on the backend and reused automatically when automation runs.";
+                    contentEl.innerHTML = "<p>Loading automation details...</p>";
                   }
                   if (openFullEl) {
                     openFullEl.textContent = "Open Automation";
@@ -273,6 +272,24 @@
                     openExternalEl.hidden = true;
                     openExternalEl.setAttribute("href", "#");
                   }
+                  fetch(src, { credentials: "same-origin" })
+                    .then((response) => {
+                      if (!response.ok) {
+                        throw new Error("Unable to load automation details.");
+                      }
+                      return response.text();
+                    })
+                    .then((html) => {
+                      if (contentEl) {
+                        contentEl.innerHTML = html;
+                      }
+                    })
+                    .catch(() => {
+                      if (contentEl) {
+                        contentEl.textContent =
+                          "Automation details could not be loaded. Open the full automation page instead.";
+                      }
+                    });
                 } else {
                   if (contentEl) {
                     contentEl.textContent =
@@ -380,7 +397,7 @@
                       type="button"
                       class="profile-control-button"
                       data-profile-open="automation"
-                      data-profile-src="/settings#automation"
+                      data-profile-src="/automation/panel"
                       data-profile-title="Automation"
                       data-profile-meta="Open your website automation controls"
                     >

@@ -2254,6 +2254,16 @@ app.get("/checkin", (req, res) => {
     title: "Check-In"
   });
 });
+app.get("/automation/panel", (req, res) => {
+  const user = requireCurrentUser(req, res);
+  if (!user) {
+    return;
+  }
+
+  res.render("partials/automation-mini", {
+    automation: getUserAutomationView(user.id)
+  });
+});
 app.get("/calendar", (req, res) => {
   const user = requireCurrentUser(req, res);
   if (!user) {
