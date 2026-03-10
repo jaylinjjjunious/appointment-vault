@@ -2670,6 +2670,22 @@ summary:focus-visible {
     width: 100%;
   }
 
+  body.page-dashboard .app-content {
+    padding: 0;
+    overflow-x: hidden;
+    overflow-x: clip;
+  }
+
+  body.page-dashboard .app-shell,
+  body.page-dashboard .app-main,
+  body.page-dashboard .app-content {
+    box-sizing: border-box;
+  }
+
+  body.page-dashboard .app-content > * {
+    min-width: 0;
+  }
+
   body.page-appointments .app-shell,
   body.page-appointment-form .app-shell,
   body.page-appointment-view .app-shell,
