@@ -407,8 +407,17 @@
     <div class="list" style="margin-top: 1rem;">
       <article class="card glass-card appointment-card">
         <div class="appointment-main" data-automation-live-root data-automation-live-endpoint="/automation/live">
+          <div class="automation-visual" data-automation-live-viewer <%= safeAutomation.viewerActive ? "" : "hidden" %>>
+            <p><strong>Live Browser:</strong></p>
+            <img
+              class="automation-visual-image"
+              data-automation-live-viewer-image
+              src="<%= safeAutomation.viewerActive && safeAutomation.viewerStreamUrl ? safeAutomation.viewerStreamUrl : '' %>"
+              alt="Live automation browser stream"
+            />
+          </div>
           <% const snapshotMode = safeAutomation.hasCurrentRunSnapshot ? "current" : (safeAutomation.hasLastRunSnapshot ? "last" : ""); %>
-          <div class="automation-visual" data-automation-live-visual <%= snapshotMode ? "" : "hidden" %>>
+          <div class="automation-visual" data-automation-live-visual <%= snapshotMode && !safeAutomation.viewerActive ? "" : "hidden" %>>
             <p><strong>Agent Visual:</strong></p>
             <img
               class="automation-visual-image"

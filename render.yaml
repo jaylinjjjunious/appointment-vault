@@ -76,6 +76,12 @@ services:
         value: "true"
       - key: PLAYWRIGHT_BROWSERS_PATH
         value: "0"
+      - key: AUTOMATION_VIEWER_ENABLED
+        value: "true"
+      - key: AUTOMATION_VIEWER_INTERVAL_MS
+        value: "800"
+      - key: AUTOMATION_VIEWER_JPEG_QUALITY
+        value: "55"
       - key: AUTOMATION_WORKER_INTERVAL_MS
         value: "60000"
       - key: TWILIO_ACCOUNT_SID
@@ -148,5 +154,11 @@ services:
         value: "true"
       - key: PLAYWRIGHT_BROWSERS_PATH
         value: "0"
+      - key: AUTOMATION_VIEWER_ENABLED
+        value: "true"
+      - key: AUTOMATION_VIEWER_INTERVAL_MS
+        value: "800"
+      - key: AUTOMATION_VIEWER_JPEG_QUALITY
+        value: "55"
       - key: AUTOMATION_WORKER_INTERVAL_MS
         value: "60000"

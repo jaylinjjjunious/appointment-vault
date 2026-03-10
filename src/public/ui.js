@@ -175,6 +175,8 @@
   const renderAutomationLive = (root, state) => {
     if (!root || !state) return;
     const logWrap = root.querySelector("[data-automation-live-log]");
+    const viewerWrap = root.querySelector("[data-automation-live-viewer]");
+    const viewerImage = root.querySelector("[data-automation-live-viewer-image]");
     const visualWrap = root.querySelector("[data-automation-live-visual]");
     const image = root.querySelector("[data-automation-live-image]");
     const status = root.querySelector("[data-automation-live-status]");
@@ -184,6 +186,7 @@
         ? state.lastRunLog
         : [];
     const snapshotMode = state.hasCurrentRunSnapshot ? "current" : (state.hasLastRunSnapshot ? "last" : "");
+    const viewerActive = Boolean(state.viewerActive && state.viewerStreamUrl);
 
     if (logWrap) {
       if (logs.length === 0) {
@@ -198,8 +201,20 @@
       }
     }
 
+    if (viewerWrap && viewerImage) {
+      if (viewerActive) {
+        viewerWrap.hidden = false;
+        if (viewerImage.getAttribute("src") !== state.viewerStreamUrl) {
+          viewerImage.setAttribute("src", state.viewerStreamUrl);
+        }
+      } else {
+        viewerWrap.hidden = true;
+        viewerImage.removeAttribute("src");
+      }
+    }
+
     if (visualWrap && image) {
-      if (snapshotMode) {
+      if (snapshotMode && !viewerActive) {
         visualWrap.hidden = false;
         image.src = `/automation/snapshot/${snapshotMode}?v=${Date.now()}`;
       } else {
@@ -209,7 +224,7 @@
     }
 
     if (status) {
-      status.hidden = String(state.lastRunStatus || "").toLowerCase() !== "running";
+      status.hidden = !viewerActive && String(state.lastRunStatus || "").toLowerCase() !== "running";
     }
   };
 

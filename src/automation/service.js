@@ -11,6 +11,13 @@ const {
 const { decryptSecret, encryptSecret, hasAutomationSecretKey } = require("./crypto");
 const { createSingleSiteAdapter } = require("./siteAdapter");
 const { hasEmailConfig, sendReminderEmail } = require("../services/emailService");
+const {
+  attachPageToViewer,
+  getViewerStateForUser,
+  startViewerSession,
+  stopViewerSession,
+  updateViewerSession
+} = require("./viewerSession");
 
 const selectIntegrationByUserStatement = db.prepare(
   `SELECT *
@@ -379,6 +386,7 @@ function toViewIntegration(row) {
     ? selectNextPhotoHandoffStatement.get(integration.userId, integration.siteId)
     : null;
   const recentPhotoHandoffs = integration ? listPhotoHandoffsForUser(integration.userId) : [];
+  const viewerState = integration ? getViewerStateForUser(integration.userId) : getViewerStateForUser(0);
   return {
     configured: hasAutomationTargetConfig(config) && hasAutomationSecretKey(),
     targetName: config.targetName || DEFAULT_TARGET_NAME,
@@ -420,7 +428,14 @@ function toViewIntegration(row) {
       recentPhotoHandoffs.find((handoff) =>
         ["pending", "preparing", "waiting_for_user"].includes(String(handoff.status || ""))
       ) || null,
-    canEmailPhotoReminder: hasEmailConfig()
+    canEmailPhotoReminder: hasEmailConfig(),
+    viewerActive: Boolean(viewerState.active),
+    viewerSessionId: viewerState.sessionId || "",
+    viewerStatus: viewerState.status || "",
+    viewerStreamUrl: viewerState.streamUrl || "",
+    viewerStartedAt: viewerState.startedAt || "",
+    viewerEndedAt: viewerState.endedAt || "",
+    viewerLastFrameAt: viewerState.lastFrameAt || ""
   };
 }
 
@@ -687,12 +702,21 @@ async function runAutomationLoginTest(userId, handlers = {}) {
     throw new Error("Save automation settings first.");
   }
   const adapter = createSingleSiteAdapter(getAutomationConfig());
+  const viewer = createViewerHooks(userId, "login test");
   return adapter.run({
     credentials: getIntegrationCredentials(integration),
     payload: {},
     dryRun: true,
-    onProgress: typeof handlers.onProgress === "function" ? handlers.onProgress : () => {},
-    onSnapshot: typeof handlers.onSnapshot === "function" ? handlers.onSnapshot : () => {}
+    onProgress: (message) => {
+      if (typeof handlers.onProgress === "function") {
+        handlers.onProgress(message);
+      }
+      viewer.onProgress(message);
+    },
+    onSnapshot: typeof handlers.onSnapshot === "function" ? handlers.onSnapshot : () => {},
+    onPageReady: viewer.onPageReady,
+    onRunFinished: viewer.onRunFinished,
+    onRunFailed: viewer.onRunFailed
   });
 }
 
@@ -709,6 +733,7 @@ async function runAutomationSubmissionDryRun(userId, handlers = {}) {
   }
 
   const adapter = createSingleSiteAdapter(getAutomationConfig());
+  const viewer = createViewerHooks(userId, "dry run");
   const { payload, missingFields } = adapter.buildPayloadFromAppointment(appointment);
   if (missingFields.length > 0) {
     throw new Error(`Dry run blocked. Missing fields: ${missingFields.join(", ")}`);
@@ -717,8 +742,16 @@ async function runAutomationSubmissionDryRun(userId, handlers = {}) {
     credentials: getIntegrationCredentials(integration),
     payload,
     dryRun: true,
-    onProgress: typeof handlers.onProgress === "function" ? handlers.onProgress : () => {},
-    onSnapshot: typeof handlers.onSnapshot === "function" ? handlers.onSnapshot : () => {}
+    onProgress: (message) => {
+      if (typeof handlers.onProgress === "function") {
+        handlers.onProgress(message);
+      }
+      viewer.onProgress(message);
+    },
+    onSnapshot: typeof handlers.onSnapshot === "function" ? handlers.onSnapshot : () => {},
+    onPageReady: viewer.onPageReady,
+    onRunFinished: viewer.onRunFinished,
+    onRunFailed: viewer.onRunFailed
   });
 }
 
@@ -904,6 +937,45 @@ function createRunObservers(userId, initialMessage) {
   };
 }
 
+function createViewerHooks(userId, label) {
+  const config = getAutomationConfig();
+  if (!config.viewerEnabled) {
+    return {
+      onProgress() {},
+      onPageReady: async () => {},
+      onRunFinished: async () => {},
+      onRunFailed: async () => {}
+    };
+  }
+  const session = startViewerSession(userId, { status: label });
+  if (!session) {
+    return {
+      onProgress() {},
+      onPageReady: async () => {},
+      onRunFinished: async () => {},
+      onRunFailed: async () => {}
+    };
+  }
+  return {
+    onProgress(message) {
+      updateViewerSession(session.sessionId, { status: message });
+    },
+    async onPageReady(page) {
+      attachPageToViewer(session.sessionId, page, config);
+    },
+    async onRunFinished(result) {
+      stopViewerSession(session.sessionId, {
+        status: result?.mode || "completed"
+      });
+    },
+    async onRunFailed(error) {
+      stopViewerSession(session.sessionId, {
+        status: error?.message || "failed"
+      });
+    }
+  };
+}
+
 function startAutomationLoginTest(userId) {
   const integration = getUserAutomationIntegrationRow(userId);
   if (!integration) {
@@ -1004,6 +1076,7 @@ async function runPhotoHandoffPrep(userId, handoffId, handlers = {}) {
     throw new Error("Photo handoff request was not found.");
   }
   const adapter = createSingleSiteAdapter(getAutomationConfig());
+  const viewer = createViewerHooks(userId, "monthly photo handoff");
   const { payload, missingFields } = adapter.buildPayloadFromAppointment({});
   if (missingFields.length > 0 && integration.siteId !== "ce-check-in") {
     throw new Error(`Photo handoff blocked. Missing fields: ${missingFields.join(", ")}`);
@@ -1011,8 +1084,16 @@ async function runPhotoHandoffPrep(userId, handoffId, handlers = {}) {
   return adapter.prepareForPhoto({
     credentials: getIntegrationCredentials(integration),
     payload,
-    onProgress: typeof handlers.onProgress === "function" ? handlers.onProgress : () => {},
-    onSnapshot: typeof handlers.onSnapshot === "function" ? handlers.onSnapshot : () => {}
+    onProgress: (message) => {
+      if (typeof handlers.onProgress === "function") {
+        handlers.onProgress(message);
+      }
+      viewer.onProgress(message);
+    },
+    onSnapshot: typeof handlers.onSnapshot === "function" ? handlers.onSnapshot : () => {},
+    onPageReady: viewer.onPageReady,
+    onRunFinished: viewer.onRunFinished,
+    onRunFailed: viewer.onRunFailed
   });
 }
 
@@ -1276,16 +1357,21 @@ async function runAutomationWorkerCycle(options = {}) {
         throw new Error(`Missing fields: ${missingFields.join(", ")}`);
       }
       const run = createRunObservers(job.userId, `Queued job for appointment ${job.appointmentId}`);
+      const viewer = createViewerHooks(job.userId, `scheduled job ${job.appointmentId}`);
       const result = await adapter.run({
         credentials,
         payload,
         dryRun: false,
         onProgress: (message) => {
           run.onProgress(message);
+          viewer.onProgress(message);
         },
         onSnapshot: (snapshotPath) => {
           run.onSnapshot(snapshotPath);
-        }
+        },
+        onPageReady: viewer.onPageReady,
+        onRunFinished: viewer.onRunFinished,
+        onRunFailed: viewer.onRunFailed
       });
       run.onComplete("Scheduled automation completed", result?.snapshotPath || null);
       completeJobStatement.run({

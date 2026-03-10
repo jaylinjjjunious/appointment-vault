@@ -135,6 +135,10 @@ const {
   startAutomationSubmissionDryRun,
   syncAutomationJobsForUser
 } = require("./automation/service");
+const {
+  addViewerStreamClient,
+  getViewerStateForUser
+} = require("./automation/viewerSession");
 require("dotenv").config({ quiet: true });
 
 (() => {
@@ -2289,11 +2293,39 @@ app.get("/automation/live", (req, res) => {
     lastHandoffCompletedAt: automation.lastHandoffCompletedAt || "",
     lastHandoffMessage: automation.lastHandoffMessage || "",
     lastHandoffResumeUrl: automation.lastHandoffResumeUrl || "",
+    viewerActive: Boolean(automation.viewerActive),
+    viewerStatus: automation.viewerStatus || "",
+    viewerStreamUrl: automation.viewerStreamUrl || "",
+    viewerStartedAt: automation.viewerStartedAt || "",
+    viewerEndedAt: automation.viewerEndedAt || "",
+    viewerLastFrameAt: automation.viewerLastFrameAt || "",
     hasCurrentRunSnapshot: Boolean(automation.hasCurrentRunSnapshot),
     hasLastRunSnapshot: Boolean(automation.hasLastRunSnapshot),
     currentRunLog: Array.isArray(automation.currentRunLog) ? automation.currentRunLog : [],
     lastRunLog: Array.isArray(automation.lastRunLog) ? automation.lastRunLog : []
   });
+});
+app.get("/automation/viewer/state", (req, res) => {
+  const user = requireCurrentUser(req, res);
+  if (!user) {
+    return;
+  }
+
+  const viewerState = getViewerStateForUser(user.id);
+  res.json(viewerState);
+});
+app.get("/automation/viewer/stream", (req, res) => {
+  const user = requireCurrentUser(req, res);
+  if (!user) {
+    return;
+  }
+
+  const requestedSessionId = String(req.query.sessionId || "").trim();
+  const viewerState = getViewerStateForUser(user.id);
+  const sessionId = requestedSessionId || viewerState.sessionId;
+  if (!viewerState.active || !sessionId || !addViewerStreamClient(user.id, sessionId, res)) {
+    res.status(404).send("No active viewer session.");
+  }
 });
 app.get("/automation/snapshot/:mode", (req, res) => {
   const user = requireCurrentUser(req, res);

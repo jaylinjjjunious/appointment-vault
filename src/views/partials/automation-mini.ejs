@@ -32,7 +32,16 @@
     <p><a href="<%= automation.lastHandoffResumeUrl %>" target="_blank" rel="noopener noreferrer">Open Photo Step</a></p>
   <% } %>
   <% const snapshotMode = automation.hasCurrentRunSnapshot ? "current" : (automation.hasLastRunSnapshot ? "last" : ""); %>
-  <div class="automation-visual" data-automation-live-visual <%= snapshotMode ? "" : "hidden" %>>
+  <div class="automation-visual" data-automation-live-viewer <%= automation.viewerActive ? "" : "hidden" %>>
+    <p><strong>Live Browser:</strong></p>
+    <img
+      class="automation-visual-image"
+      data-automation-live-viewer-image
+      src="<%= automation.viewerActive && automation.viewerStreamUrl ? automation.viewerStreamUrl : '' %>"
+      alt="Live automation browser stream"
+    />
+  </div>
+  <div class="automation-visual" data-automation-live-visual <%= snapshotMode && !automation.viewerActive ? "" : "hidden" %>>
     <p><strong>Agent Visual:</strong></p>
     <img
       class="automation-visual-image"

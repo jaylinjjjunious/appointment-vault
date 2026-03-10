@@ -311,7 +311,10 @@ function createSingleSiteAdapter(config = getAutomationConfig()) {
       payload,
       dryRun = false,
       onProgress = () => {},
-      onSnapshot = () => {}
+      onSnapshot = () => {},
+      onPageReady = () => {},
+      onRunFinished = () => {},
+      onRunFailed = () => {}
     }) {
       if (!hasAutomationTargetConfig(config)) {
         throw new Error("Automation target is not fully configured.");
@@ -335,12 +338,19 @@ function createSingleSiteAdapter(config = getAutomationConfig()) {
       const page = await browser.newPage();
 
       try {
+        await onPageReady(page);
         await progress("Creating browser page", "page-created");
         await this.login(page, credentials, async (message) => {
           await progress(message);
         });
         if (!payload || Object.keys(payload).length === 0) {
           await progress("Login test completed", "login-complete");
+          await onRunFinished({
+            ok: true,
+            mode: "login",
+            externalReference: null,
+            snapshotPath: latestSnapshotPath || null
+          });
           return {
             ok: true,
             mode: "login",
@@ -356,6 +366,12 @@ function createSingleSiteAdapter(config = getAutomationConfig()) {
         });
         if (dryRun) {
           await progress("Dry run completed", "dry-run-complete");
+          await onRunFinished({
+            ok: true,
+            mode: "dry-run",
+            externalReference: null,
+            snapshotPath: latestSnapshotPath || null
+          });
           return {
             ok: true,
             mode: "dry-run",
@@ -370,6 +386,12 @@ function createSingleSiteAdapter(config = getAutomationConfig()) {
           await progress(message);
         });
         await progress("Automation completed successfully", "submit-complete");
+        await onRunFinished({
+          ok: true,
+          mode: "submit",
+          externalReference: page.url(),
+          snapshotPath: latestSnapshotPath || null
+        });
         return {
           ok: true,
           mode: "submit",
@@ -389,6 +411,7 @@ function createSingleSiteAdapter(config = getAutomationConfig()) {
           await page.content(),
           screenshotBuffer
         );
+        await onRunFailed(error);
         throw error;
       } finally {
         await page.close().catch(() => null);
