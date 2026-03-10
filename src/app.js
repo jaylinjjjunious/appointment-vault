@@ -2266,6 +2266,24 @@ app.get("/automation/panel", (req, res) => {
     automation: getUserAutomationView(user.id)
   });
 });
+app.get("/automation/live", (req, res) => {
+  const user = requireCurrentUser(req, res);
+  if (!user) {
+    return;
+  }
+
+  const automation = getUserAutomationView(user.id);
+  res.json({
+    lastRunStatus: automation.lastRunStatus || "idle",
+    lastRunAt: automation.lastRunAt || "",
+    lastSuccessAt: automation.lastSuccessAt || "",
+    lastFailureMessage: automation.lastFailureMessage || "",
+    hasCurrentRunSnapshot: Boolean(automation.hasCurrentRunSnapshot),
+    hasLastRunSnapshot: Boolean(automation.hasLastRunSnapshot),
+    currentRunLog: Array.isArray(automation.currentRunLog) ? automation.currentRunLog : [],
+    lastRunLog: Array.isArray(automation.lastRunLog) ? automation.lastRunLog : []
+  });
+});
 app.get("/automation/snapshot/:mode", (req, res) => {
   const user = requireCurrentUser(req, res);
   if (!user) {

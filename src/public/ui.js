@@ -1,3 +1,5 @@
+/* global MutationObserver, HTMLElement */
+
 (() => {
   const createStatusMessage = (form) => {
     let el = form.querySelector("[data-form-status]");
@@ -160,6 +162,102 @@
     });
   };
 
+  const automationRoots = new WeakSet();
+
+  const escapeHtml = (value) =>
+    String(value || "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;");
+
+  const renderAutomationLive = (root, state) => {
+    if (!root || !state) return;
+    const logWrap = root.querySelector("[data-automation-live-log]");
+    const visualWrap = root.querySelector("[data-automation-live-visual]");
+    const image = root.querySelector("[data-automation-live-image]");
+    const status = root.querySelector("[data-automation-live-status]");
+    const logs = Array.isArray(state.currentRunLog) && state.currentRunLog.length > 0
+      ? state.currentRunLog
+      : Array.isArray(state.lastRunLog)
+        ? state.lastRunLog
+        : [];
+    const snapshotMode = state.hasCurrentRunSnapshot ? "current" : (state.hasLastRunSnapshot ? "last" : "");
+
+    if (logWrap) {
+      if (logs.length === 0) {
+        logWrap.innerHTML = '<p class="section-empty" data-automation-live-empty>No automation activity yet.</p>';
+      } else {
+        logWrap.innerHTML = logs
+          .map(
+            (entry) =>
+              `<p data-automation-live-entry><strong>${escapeHtml(entry.at || "")}</strong> ${escapeHtml(entry.message || "")}</p>`
+          )
+          .join("");
+      }
+    }
+
+    if (visualWrap && image) {
+      if (snapshotMode) {
+        visualWrap.hidden = false;
+        image.src = `/automation/snapshot/${snapshotMode}?v=${Date.now()}`;
+      } else {
+        visualWrap.hidden = true;
+        image.removeAttribute("src");
+      }
+    }
+
+    if (status) {
+      status.hidden = String(state.lastRunStatus || "").toLowerCase() !== "running";
+    }
+  };
+
+  const bindAutomationLive = (root) => {
+    if (!root || automationRoots.has(root)) return;
+    automationRoots.add(root);
+
+    const endpoint = String(root.getAttribute("data-automation-live-endpoint") || "").trim();
+    if (!endpoint) return;
+
+    let timer = null;
+    let stopped = false;
+
+    const refresh = async () => {
+      if (stopped) return;
+      try {
+        const response = await fetch(endpoint, {
+          credentials: "same-origin",
+          headers: {
+            Accept: "application/json"
+          }
+        });
+        if (!response.ok) {
+          return;
+        }
+        const state = await response.json();
+        renderAutomationLive(root, state);
+        const isRunning = String(state.lastRunStatus || "").toLowerCase() === "running";
+        window.clearTimeout(timer);
+        timer = window.setTimeout(refresh, isRunning ? 1200 : 4000);
+      } catch (error) {
+        window.clearTimeout(timer);
+        timer = window.setTimeout(refresh, 4000);
+      }
+    };
+
+    refresh();
+
+    const observer = new MutationObserver(() => {
+      if (!document.body.contains(root)) {
+        stopped = true;
+        window.clearTimeout(timer);
+        observer.disconnect();
+      }
+    });
+    observer.observe(document.body, { childList: true, subtree: true });
+  };
+
   const root = document.documentElement;
   const savedTheme = localStorage.getItem("vault-theme");
   const prefersLight =
@@ -226,5 +324,22 @@
       el.hidden = true;
     });
     bindAppointmentForm();
+    document.querySelectorAll("[data-automation-live-root]").forEach((root) => bindAutomationLive(root));
   });
+
+  const automationObserver = new MutationObserver((mutations) => {
+    mutations.forEach((mutation) => {
+      mutation.addedNodes.forEach((node) => {
+        if (!(node instanceof HTMLElement)) return;
+        if (node.matches("[data-automation-live-root]")) {
+          bindAutomationLive(node);
+        }
+        node.querySelectorAll?.("[data-automation-live-root]").forEach((root) => bindAutomationLive(root));
+      });
+    });
+  });
+
+  if (document.body) {
+    automationObserver.observe(document.body, { childList: true, subtree: true });
+  }
 })();
