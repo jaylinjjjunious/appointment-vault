@@ -26,7 +26,7 @@
 
 <section class="page-heading settings-heading">
   <h1>Settings</h1>
-  <p>Past appointments are automatically moved into History.</p>
+  <p><%= safeUser ? "Past appointments are automatically moved into History." : "Connect Google from here to unlock the rest of Appointment Vault." %></p>
 </section>
 <% if (hasSavedPrefs) { %>
   <section class="card glass-panel status-card">
@@ -35,6 +35,7 @@
 <% } %>
 
 <div data-tab-root class="settings-layout">
+  <% if (safeUser) { %>
   <div class="tabs tabs-boxed mt-6">
     <a class="tab tab-active" href="#overview" data-tab="overview">Overview</a>
     <a class="tab" href="#appointments" data-tab="appointments">Appointments</a>
@@ -43,6 +44,7 @@
     <a class="tab" href="#history" data-tab="history">History</a>
     <a class="tab" href="#errors" data-tab="errors">Error Finder</a>
   </div>
+  <% } %>
 
 <% if (safeTestProfileActive && safeTestProfile) { %>
   <section class="calendar-section glass-panel" data-tab-panel="overview">
@@ -69,13 +71,14 @@
       <button class="button glass-button button-secondary" type="submit" data-activity="google_disconnect" data-activity-title="Disconnected Google Calendar">Disconnect Google Calendar</button>
     </form>
   <% } else { %>
-    <p class="section-empty">Not connected yet.</p>
+    <p class="section-empty"><%= safeUser ? "Not connected yet." : "Sign in with Google here instead of a separate sign-in page." %></p>
     <div class="actions">
       <a class="button glass-button" href="/auth/google" data-activity="google_connect" data-activity-title="Connected Google Calendar">Sign In with Google</a>
     </div>
   <% } %>
 </section>
 
+<% if (safeUser) { %>
 <section id="appointments" class="calendar-section glass-panel" data-tab-panel="appointments">
   <h2>Reminder Preferences</h2>
   <p class="section-empty">Voice first, with SMS fallback if voice fails.</p>
@@ -299,6 +302,7 @@
 </div>
 
 </div>
+<% } %>
 
 <script>
   (() => {

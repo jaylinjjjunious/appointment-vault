@@ -491,20 +491,20 @@ app.use((req, res, next) => {
   const isApiPath = req.path.startsWith("/api/");
   const isPublic = publicPrefixes.some(
     (prefix) => req.path === prefix || req.path.startsWith(`${prefix}/`)
-  );
+  ) || req.path === "/settings" || req.path === "/settings/";
   if (!AUTH_REQUIRED || req.currentUser || isPublic) {
     next();
     return;
   }
 
-  console.log("[auth-guard] redirecting to /auth/login", buildAuthDebugSnapshot(req, res));
+  console.log("[auth-guard] redirecting to /settings", buildAuthDebugSnapshot(req, res));
 
   if (isApiPath) {
     res.status(401).json({ ok: false, message: "Authentication required." });
     return;
   }
 
-  res.redirect("/auth/login");
+  res.redirect("/settings");
 });
 app.use("/public", express.static(path.join(__dirname, "public")));
 app.use((req, res, next) => {
@@ -1553,7 +1553,7 @@ app.get("/auth/google", async (req, res, next) => {
 app.get("/auth/google/callback", async (req, res, next) => {
   const code = String(req.query.code || "");
   const state = String(req.query.state || "").trim();
-  const authErrorRedirect = "/auth/login?google=auth_error";
+  const authErrorRedirect = "/settings?google=auth_error";
   if (!code) {
     res.redirect(authErrorRedirect);
     return;
@@ -2128,26 +2128,29 @@ app.get("/partials/appointments-sections", async (req, res) => {
 
 function renderSettingsPage(req, res, next) {
   try {
-    const user = requireCurrentUser(req, res);
-    if (!user) {
-      return;
-    }
+    const user = getCurrentUser(req);
 
     if (/^\/settings\/history\/?$/i.test(String(req.path || ""))) {
+      if (!user) {
+        res.redirect("/settings");
+        return;
+      }
       renderSettingsHistoryPage(req, res, next);
       return;
     }
 
-    const historyAppointments = getHistoryAppointments(user.id);
+    const historyAppointments = getHistoryAppointments(user?.id || null);
     const reminderActivityPage = clampPageNumber(req.query.activityPage, 1);
     const reminderStatus = String(req.query.status || "").trim();
     const reminderChannel = String(req.query.channel || "").trim();
-    const reminderActivity = getReminderActivity(user.id, {
-      page: reminderActivityPage,
-      pageSize: 20,
-      status: reminderStatus,
-      channel: reminderChannel
-    });
+    const reminderActivity = user
+      ? getReminderActivity(user.id, {
+          page: reminderActivityPage,
+          pageSize: 20,
+          status: reminderStatus,
+          channel: reminderChannel
+        })
+      : { items: [], page: 1, pageSize: 20, total: 0 };
 
     const callStatus = String(req.query.call || "");
     const callStatusMessage =
