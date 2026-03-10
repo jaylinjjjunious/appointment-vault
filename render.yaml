@@ -4,7 +4,7 @@ services:
     env: node
     plan: free
     autoDeploy: true
-    buildCommand: npm ci && PLAYWRIGHT_BROWSERS_PATH=0 npm run playwright:install && PLAYWRIGHT_BROWSERS_PATH=0 npm run playwright:verify
+    buildCommand: npm ci && npm run ui:build && PLAYWRIGHT_BROWSERS_PATH=0 npm run playwright:install && PLAYWRIGHT_BROWSERS_PATH=0 npm run playwright:verify
     startCommand: npm start
     healthCheckPath: /health
     disk:
