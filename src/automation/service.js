@@ -446,7 +446,7 @@ function saveUserAutomationIntegration(userId, input = {}) {
   const nextPassword = String(input.password || "").trim();
   const enabled = parseBoolean(input.enabled, false);
   const clearSavedCredentials = parseBoolean(input.clearSavedCredentials, false);
-  const monthlyPhotoEnabled = parseBoolean(input.monthlyPhotoEnabled, existing ? Number(existing.monthlyPhotoEnabled) === 1 : false);
+  const monthlyPhotoEnabled = parseBoolean(input.monthlyPhotoEnabled, false);
   const monthlyPhotoDay = Math.min(
     Math.max(parseInteger(input.monthlyPhotoDay, Number(existing?.monthlyPhotoDay || 1)), 1),
     28
