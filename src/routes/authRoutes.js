@@ -6,6 +6,15 @@ const { registerLocalUser, authenticateLocalUser } = require("../services/authSe
 
 const router = express.Router();
 const csrfProtection = csurf();
+const TEST_PROFILE_ENABLED = ["1", "true", "yes", "on"].includes(
+  String(process.env.TEMP_TEST_PROFILE || process.env.TEST_PROFILE_ENABLED || "")
+    .trim()
+    .toLowerCase()
+);
+const TEST_PROFILE_NAME =
+  String(process.env.TEST_PROFILE_NAME || "").trim() || "Temporary Test Profile";
+const TEST_PROFILE_EMAIL =
+  String(process.env.TEST_PROFILE_EMAIL || "").trim() || "test-profile@appointment-vault.local";
 
 function buildAuthDebugSnapshot(req, res) {
   return {
@@ -126,7 +135,8 @@ function renderAuthPage(res, view, model = {}) {
     title: model.title,
     error: model.error || "",
     values: model.values || {},
-    csrfToken: model.csrfToken || ""
+    csrfToken: model.csrfToken || "",
+    testProfileEnabled: TEST_PROFILE_ENABLED
   });
 }
 
@@ -228,6 +238,34 @@ router.post("/register", registerLimiter, csrfProtection, async (req, res, next)
     }
     next(error);
   }
+});
+
+router.post("/bypass", csrfProtection, (req, res, next) => {
+  if (!TEST_PROFILE_ENABLED) {
+    res.status(404).render("404", { title: "Not Found" });
+    return;
+  }
+
+  req.session.regenerate((error) => {
+    if (error) {
+      next(error);
+      return;
+    }
+    req.session.testProfile = {
+      name: TEST_PROFILE_NAME,
+      email: TEST_PROFILE_EMAIL,
+      role: "tester"
+    };
+    req.session.authProvider = "test";
+    req.session.authenticatedAt = new Date().toISOString();
+    req.session.save((saveError) => {
+      if (saveError) {
+        next(saveError);
+        return;
+      }
+      res.redirect("/dashboard");
+    });
+  });
 });
 
 router.post("/logout", ensureSameOrigin, (req, res) => {

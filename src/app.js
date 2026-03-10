@@ -176,7 +176,11 @@ const runtimeEnv = env || fallbackEnv;
 const SESSION_SECRET = process.env.SESSION_SECRET || "appointment-vault-session-secret-change-me";
 const IS_PRODUCTION = process.env.NODE_ENV === "production";
 const AUTH_REQUIRED = runtimeEnv.app.authRequired;
-const TEST_PROFILE_ENABLED = false;
+const TEST_PROFILE_ENABLED = ["1", "true", "yes", "on"].includes(
+  String(process.env.TEMP_TEST_PROFILE || process.env.TEST_PROFILE_ENABLED || "")
+    .trim()
+    .toLowerCase()
+);
 const TEST_PROFILE_NAME =
   String(process.env.TEST_PROFILE_NAME || "").trim() || "Temporary Test Profile";
 const TEST_PROFILE_EMAIL =

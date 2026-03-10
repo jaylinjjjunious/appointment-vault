@@ -28,6 +28,12 @@
       <a class="button glass-button button-secondary" href="/auth/login">Back to Sign In</a>
     </div>
   </form>
+  <% if (testProfileEnabled) { %>
+    <form class="actions" action="/auth/bypass" method="POST" style="margin-top: 1rem;">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>" />
+      <button class="button glass-button button-secondary" type="submit">Continue with Test Profile</button>
+    </form>
+  <% } %>
 </section>
 
 <%- include("../partials/bottom") %>
