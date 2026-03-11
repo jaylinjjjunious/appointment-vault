@@ -774,15 +774,26 @@ async function runAutomationSubmissionDryRun(userId, handlers = {}) {
     throw new Error("Save automation settings first.");
   }
 
-  const today = new Date().toISOString().slice(0, 10);
-  const appointment = selectEligibleAppointmentsForUserStatement.all(userId, today, "9999-12-31")[0] || null;
-  if (!appointment) {
-    throw new Error("No eligible appointments found for a dry run.");
-  }
-
   const adapter = createSingleSiteAdapter(getAutomationConfig());
   const viewer = createViewerHooks(userId, "dry run");
-  const { payload, missingFields } = adapter.buildPayloadFromAppointment(appointment);
+  const today = new Date().toISOString().slice(0, 10);
+  const appointment =
+    selectEligibleAppointmentsForUserStatement.all(userId, today, "9999-12-31")[0] || null;
+  if (appointment) {
+    if (typeof handlers.onProgress === "function") {
+      handlers.onProgress(`Using appointment ${appointment.id} for dry run`);
+    }
+    viewer.onProgress(`Using appointment ${appointment.id} for dry run`);
+  } else if (integration.siteId !== "ce-check-in") {
+    throw new Error("No eligible appointments found for a dry run.");
+  } else {
+    if (typeof handlers.onProgress === "function") {
+      handlers.onProgress("No eligible appointment found. Using saved CE Check-In data for dry run");
+    }
+    viewer.onProgress("No eligible appointment found. Using saved CE Check-In data for dry run");
+  }
+
+  const { payload, missingFields } = adapter.buildPayloadFromAppointment(appointment || {});
   if (missingFields.length > 0) {
     throw new Error(`Dry run blocked. Missing fields: ${missingFields.join(", ")}`);
   }

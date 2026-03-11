@@ -14,14 +14,14 @@
   <p><strong>Last Success:</strong> <%= automation.lastSuccessAt || "Never" %></p>
   <p><strong>Next Run:</strong> <%= automation.nextRunAt || "Not scheduled" %></p>
   <p><strong>Monthly Photo Step:</strong> <%= automation.monthlyPhotoEnabled ? "Enabled" : "Off" %></p>
-  <p><strong>Next Photo Step:</strong> <%= automation.nextPhotoHandoffAt || "Not scheduled" %></p>
+  <p><strong>Next Scheduled Photo Step:</strong> <%= automation.nextPhotoHandoffAt || "Not scheduled" %></p>
   <p><strong>Photo Status:</strong> <%= automation.lastHandoffStatus || "idle" %></p>
   <% if (automation.lastFailureMessage) { %>
     <p class="error-text"><strong>Last Failure:</strong> <%= automation.lastFailureMessage %></p>
   <% } %>
   <% if (automation.lastHandoffMessage) { %>
     <p class="<%= automation.lastHandoffStatus === 'failed' ? 'error-text' : '' %>">
-      <strong>Photo Step:</strong> <%= automation.lastHandoffMessage %>
+      <strong>Photo Message:</strong> <%= automation.lastHandoffMessage %>
     </p>
   <% } %>
   <p class="section-empty">

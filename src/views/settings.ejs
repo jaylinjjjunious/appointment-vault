@@ -342,7 +342,7 @@
         <div class="appointment-main">
           <p><strong>Monthly Photo Handoff:</strong> <%= safeAutomation.monthlyPhotoEnabled ? "Enabled" : "Off" %></p>
           <p><strong>Monthly Day:</strong> <%= safeAutomation.monthlyPhotoDay || 1 %></p>
-          <p><strong>Next Photo Step:</strong> <%= safeAutomation.nextPhotoHandoffAt || "Not scheduled" %></p>
+          <p><strong>Next Scheduled Photo Step:</strong> <%= safeAutomation.nextPhotoHandoffAt || "Not scheduled" %></p>
           <p><strong>Last Photo Status:</strong> <%= safeAutomation.lastHandoffStatus || "idle" %></p>
           <p><strong>Last Photo Update:</strong> <%= safeAutomation.lastHandoffAt || "Never" %></p>
           <% if (safeAutomation.lastHandoffCompletedAt) { %>
@@ -350,7 +350,7 @@
           <% } %>
           <% if (safeAutomation.lastHandoffMessage) { %>
             <p class="<%= safeAutomation.lastHandoffStatus === 'failed' ? 'error-text' : '' %>">
-              <strong>Photo Step:</strong> <%= safeAutomation.lastHandoffMessage %>
+              <strong>Photo Message:</strong> <%= safeAutomation.lastHandoffMessage %>
             </p>
           <% } %>
         </div>

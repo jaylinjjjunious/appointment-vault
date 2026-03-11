@@ -71,4 +71,37 @@ describe("automation helpers", () => {
     process.env.AUTOMATION_AUTH_CHECK_SELECTOR = previous.AUTOMATION_AUTH_CHECK_SELECTOR;
     process.env.AUTOMATION_LOGIN_SUBMIT_SELECTOR = previous.AUTOMATION_LOGIN_SUBMIT_SELECTOR;
   });
+
+  it("uses saved ce check-in payload for dry runs without an appointment", () => {
+    const { createSingleSiteAdapter } = require("../src/automation/siteAdapter");
+    const adapter = createSingleSiteAdapter({
+      siteId: "ce-check-in",
+      targetName: "Ce Check-In",
+      questionnaireAnswers: {
+        "Are you currently employed?": "No"
+      },
+      contactLine1: "1951 Golden State Ave Apt 11",
+      contactLine2: "",
+      contactCity: "Bakersfield",
+      contactState: "CA",
+      contactZip: "93301",
+      updateMailingAddress: true
+    });
+
+    const { payload, missingFields } = adapter.buildPayloadFromAppointment({});
+
+    expect(missingFields).toEqual([]);
+    expect(payload).toMatchObject({
+      updateMailingAddress: true,
+      contact: {
+        line1: "1951 Golden State Ave Apt 11",
+        city: "Bakersfield",
+        state: "CA",
+        zip: "93301"
+      },
+      questionnaireAnswers: {
+        "Are you currently employed?": "No"
+      }
+    });
+  });
 });
